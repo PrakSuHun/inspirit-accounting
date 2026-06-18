@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       }
       const 공급가 = Number(p.공급가) || 0;
       const 부가세 = p.부가세 != null ? Number(p.부가세) : Math.round(공급가 * 0.1);
-      appendRows("projects", [
+      await appendRows("projects", [
         {
           "프로젝트명(내부)": String(p["프로젝트명(내부)"]),
           클라이언트: String(p.클라이언트 ?? ""),
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       if (!body.name) {
         return NextResponse.json({ ok: false, error: "잘못된 요청" }, { status: 400 });
       }
-      const ok = deleteRowByMatch("projects", { "프로젝트명(내부)": body.name });
+      const ok = await deleteRowByMatch("projects", { "프로젝트명(내부)": body.name });
       return NextResponse.json({ ok });
     }
 
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
         patch.계약합계 = 공급가 + 부가세;
       }
     }
-    const ok = updateRow("projects", "프로젝트명(내부)", name, patch);
+    const ok = await updateRow("projects", "프로젝트명(내부)", name, patch);
     return NextResponse.json({ ok });
   } catch (e) {
     return NextResponse.json(

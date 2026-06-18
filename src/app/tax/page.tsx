@@ -1,4 +1,4 @@
-import { loadLedger, taxStatusMap } from "@/lib/data";
+import { loadLedger } from "@/lib/data";
 import {
   vatByPeriod,
   taxableIncomeByYear,
@@ -20,14 +20,12 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-export default function TaxPage() {
-  const ledger = loadLedger();
+export default async function TaxPage() {
+  const ledger = await loadLedger();
   const { periods, 카드매입_연간 } = vatByPeriod(ledger);
   const income = taxableIncomeByYear(ledger);
   const ded = deductibleByYear(ledger);
   const rev = invoicedRevenueByYear(ledger);
-  const tax = taxStatusMap(ledger);
-  const 세이프박스 = tax["[세이프박스] 추정 적립잔액(통장)"] ?? 0;
 
   // 다음 신고 = 가장 최근 과세기간
   const next = periods[periods.length - 1];
@@ -96,16 +94,6 @@ export default function TaxPage() {
             신고 시 해당 기간 카드 매입세액을 추가로 차감하세요.
           </p>
         </Card>
-      </div>
-
-      {/* 세이프박스 */}
-      <SectionTitle>세금 세이프박스</SectionTitle>
-      <div className="px-5">
-        <Gauge
-          label="부가세 다음 납부 대비 적립"
-          current={세이프박스}
-          target={Math.max(0, next?.납부세액 ?? 0)}
-        />
       </div>
 
       {/* 종합소득세 — 공제 기반 (매출 − 필요경비) */}

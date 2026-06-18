@@ -6,7 +6,7 @@ import { withholdingByPerson } from "@/lib/tax";
 export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type") ?? "jiup";
   const year = req.nextUrl.searchParams.get("year") ?? "2026";
-  const ledger = loadLedger();
+  const ledger = await loadLedger();
   const people = withholdingByPerson(ledger, year);
 
   let header: string[];

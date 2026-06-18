@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       if (!m.프로젝트) {
         return NextResponse.json({ ok: false, error: "잘못된 요청" }, { status: 400 });
       }
-      const ok = deleteRowByMatch("project_costs", m);
+      const ok = await deleteRowByMatch("project_costs", m);
       return NextResponse.json({ ok });
     }
 
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    appendRows("project_costs", [
+    await appendRows("project_costs", [
       {
         프로젝트: String(c.프로젝트),
         구분: String(c.구분 ?? "경비"),

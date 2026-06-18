@@ -12,7 +12,7 @@ export default async function EditProjectPage({
   params: Promise<{ idx: string }>;
 }) {
   const { idx } = await params;
-  const ledger = loadLedger();
+  const ledger = await loadLedger();
   const p = ledger.projects[Number(idx)];
   if (!p) notFound();
   const clients = ledger.clients.map((c) => c.거래처명).filter(Boolean);

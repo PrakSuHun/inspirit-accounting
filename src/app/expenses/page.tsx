@@ -11,8 +11,8 @@ export type ExpenseItem = {
   금액: number;
 };
 
-export default function ExpensesPage() {
-  const ledger = loadLedger();
+export default async function ExpensesPage() {
+  const ledger = await loadLedger();
   // 최신순 정렬
   const items: ExpenseItem[] = [...ledger.common_expenses]
     .map((e) => ({ 지출일: e.지출일, 구분: e.구분, 항목: e.항목, 금액: e.금액 }))

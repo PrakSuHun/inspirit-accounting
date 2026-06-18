@@ -17,9 +17,9 @@ export async function POST(req: NextRequest) {
       );
     }
     const 수령인 = String(p.수령인).trim();
-    if (p.주민번호) upsertFreelancer(수령인, String(p.주민번호));
+    if (p.주민번호) await upsertFreelancer(수령인, String(p.주민번호));
 
-    appendRows("project_costs", [
+    await appendRows("project_costs", [
       {
         프로젝트: String(p.프로젝트 || "인건비"),
         구분: "용역비",
@@ -40,14 +40,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function upsertFreelancer(이름: string, 주민번호: string) {
-  const ledger = loadLedger();
+async function upsertFreelancer(이름: string, 주민번호: string) {
+  const ledger = await loadLedger();
   const existing = ledger.partners.find((pt) => pt.이름 === 이름);
   if (!existing) {
-    appendRows("partners", [
+    await appendRows("partners", [
       { 이름, 소득구분: "사업소득(3.3%)", 역할: "프리랜서", 상태: "활성", 주민번호 },
     ]);
   } else if (!existing.주민번호) {
-    updateRow("partners", "이름", 이름, { 주민번호 });
+    await updateRow("partners", "이름", 이름, { 주민번호 });
   }
 }

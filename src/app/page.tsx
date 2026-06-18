@@ -21,8 +21,8 @@ import BalanceCard from "@/components/BalanceCard";
 
 export const dynamic = "force-dynamic";
 
-export default function Dashboard() {
-  const ledger = loadLedger();
+export default async function Dashboard() {
+  const ledger = await loadLedger();
   const rolls = rollupProjects(ledger);
   const months = monthlyRevenue(ledger);
 

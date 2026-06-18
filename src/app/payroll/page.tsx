@@ -9,8 +9,8 @@ import Payroll from "@/components/Payroll";
 
 export const dynamic = "force-dynamic";
 
-export default function PayrollPage() {
-  const ledger = loadLedger();
+export default async function PayrollPage() {
+  const ledger = await loadLedger();
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   const y = now.getFullYear();
@@ -30,7 +30,8 @@ export default function PayrollPage() {
   const defaultMonth = `${dy}-${pad(dmo)}`;
 
   const today = `${y}-${pad(mo)}-${pad(day)}`;
-  const schedule = withholdingSchedule(ledger, loadFilings(), today);
+  const filings = await loadFilings();
+  const schedule = withholdingSchedule(ledger, filings, today);
   const payments = withholdingPayments(ledger);
   const fl = [...freelancerSet(ledger)];
   const projects = ledger.projects.map((p) => p["프로젝트명(내부)"]);

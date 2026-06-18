@@ -5,8 +5,8 @@ import { ChevronLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default function NewProjectPage() {
-  const ledger = loadLedger();
+export default async function NewProjectPage() {
+  const ledger = await loadLedger();
   const clients = ledger.clients.map((c) => c.거래처명).filter(Boolean);
 
   return (

@@ -46,35 +46,37 @@ function toDateStr(v: unknown): string {
   return s.length >= 10 ? s.slice(0, 10) : s;
 }
 
-function readWorkbook(): XLSX.WorkBook {
+type RawData = Record<string, Record<string, unknown>[]>;
+
+// 데이터 소스 추상화: sheets(클라우드) 또는 xlsx(로컬). 모든 탭을 행객체 배열로.
+async function getRawRows(): Promise<RawData> {
+  if ((process.env.DATA_SOURCE ?? "xlsx") === "sheets") {
+    const { sheetsRawRows } = await import("./sheets");
+    return sheetsRawRows();
+  }
+  // 로컬 xlsx (cellDates 안 씀 → 날짜는 serial 로 읽고 변환)
   if (!XLSX_PATH || !fs.existsSync(XLSX_PATH)) {
     throw new Error(
       `엑셀 파일을 찾을 수 없습니다: ${XLSX_PATH}\n.env.local 의 XLSX_PATH 를 확인하세요.`
     );
   }
-  // Next.js 번들러 환경에서는 XLSX.readFile 이 fs 를 못 찾으므로 직접 버퍼로 읽음.
-  // cellDates 는 타임존 버그(날짜 하루 밀림)가 있어 안 씀 → 날짜는 serial 로 읽고 변환.
-  const buf = fs.readFileSync(XLSX_PATH);
-  return XLSX.read(buf);
-}
-
-function sheetRows(wb: XLSX.WorkBook, name: string): Record<string, unknown>[] {
-  const ws = wb.Sheets[name];
-  if (!ws) return [];
-  return XLSX.utils.sheet_to_json(ws, { defval: "", raw: true });
-}
-
-function sheetMatrix(wb: XLSX.WorkBook, name: string): (string | number)[][] {
-  const ws = wb.Sheets[name];
-  if (!ws) return [];
-  return XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
+  const wb = XLSX.read(fs.readFileSync(XLSX_PATH));
+  const out: RawData = {};
+  for (const name of wb.SheetNames) {
+    out[name] = XLSX.utils.sheet_to_json(wb.Sheets[name], {
+      defval: "",
+      raw: true,
+    });
+  }
+  return out;
 }
 
 // ── 전체 원장 로드 ───────────────────────────────────────────────
-export function loadLedger(): Ledger {
-  const wb = readWorkbook();
+export async function loadLedger(): Promise<Ledger> {
+  const raw = await getRawRows();
+  const sheetRows = (name: string): Record<string, unknown>[] => raw[name] ?? [];
 
-  const projects: Project[] = sheetRows(wb, "projects").map((r) => ({
+  const projects: Project[] = sheetRows("projects").map((r) => ({
     "프로젝트명(내부)": String(r["프로젝트명(내부)"] ?? ""),
     클라이언트: String(r["클라이언트"] ?? ""),
     납품일: toDateStr(r["납품일"]),
@@ -86,7 +88,7 @@ export function loadLedger(): Ledger {
     계산서매핑: String(r["계산서매핑"] ?? ""),
   }));
 
-  const project_costs: ProjectCost[] = sheetRows(wb, "project_costs").map(
+  const project_costs: ProjectCost[] = sheetRows("project_costs").map(
     (r) => ({
       프로젝트: String(r["프로젝트"] ?? ""),
       구분: String(r["구분"] ?? ""),
@@ -100,7 +102,6 @@ export function loadLedger(): Ledger {
   );
 
   const bank_transactions: BankTransaction[] = sheetRows(
-    wb,
     "bank_transactions"
   ).map((r) => ({
     해시: String(r["해시"] ?? ""),
@@ -117,7 +118,7 @@ export function loadLedger(): Ledger {
     매칭ID: String(r["매칭ID"] ?? ""),
   }));
 
-  const accounts: Account[] = sheetRows(wb, "accounts").map((r) => ({
+  const accounts: Account[] = sheetRows("accounts").map((r) => ({
     계좌명: String(r["계좌명"] ?? ""),
     은행: String(r["은행"] ?? ""),
     용도: String(r["용도"] ?? ""),
@@ -127,12 +128,12 @@ export function loadLedger(): Ledger {
 
   return {
     accounts,
-    clients: sheetRows(wb, "clients").map((r) => ({
+    clients: sheetRows("clients").map((r) => ({
       거래처명: String(r["거래처명"] ?? ""),
       사업자번호: String(r["사업자번호"] ?? ""),
       메모: String(r["메모"] ?? ""),
     })),
-    partners: sheetRows(wb, "partners").map((r) => ({
+    partners: sheetRows("partners").map((r) => ({
       이름: String(r["이름"] ?? ""),
       소득구분: String(r["소득구분"] ?? ""),
       역할: String(r["역할"] ?? ""),
@@ -142,7 +143,7 @@ export function loadLedger(): Ledger {
     projects,
     project_costs,
     bank_transactions,
-    tax_invoices: sheetRows(wb, "tax_invoices").map((r) => ({
+    tax_invoices: sheetRows("tax_invoices").map((r) => ({
       구분: String(r["구분"] ?? ""),
       작성일: toDateStr(r["작성일"]),
       승인번호: String(r["승인번호"] ?? ""),
@@ -154,13 +155,13 @@ export function loadLedger(): Ledger {
       종류: String(r["종류"] ?? ""),
       프로젝트매핑: String(r["프로젝트매핑"] ?? ""),
     })),
-    common_expenses: sheetRows(wb, "common_expenses").map((r) => ({
+    common_expenses: sheetRows("common_expenses").map((r) => ({
       지출일: toDateStr(r["지출일"]),
       구분: String(r["구분"] ?? ""),
       항목: String(r["항목"] ?? ""),
       금액: toNum(r["금액"]),
     })),
-    card_input_vat: sheetRows(wb, "card_input_vat").map((r) => ({
+    card_input_vat: sheetRows("card_input_vat").map((r) => ({
       연도: String(r["연도"] ?? ""),
       가맹점: String(r["가맹점"] ?? ""),
       사업자번호: String(r["사업자번호"] ?? ""),
@@ -170,7 +171,7 @@ export function loadLedger(): Ledger {
       합계: toNum(r["합계"]),
       유형: String(r["유형"] ?? ""),
     })),
-    assets: sheetRows(wb, "assets").map((r) => ({
+    assets: sheetRows("assets").map((r) => ({
       취득일: toDateStr(r["취득일"]),
       품명: String(r["품명"] ?? ""),
       취득가: toNum(r["취득가"]),
@@ -179,7 +180,7 @@ export function loadLedger(): Ledger {
       종료일: toDateStr(r["종료일"]),
       월감가상각: toNum(r["월감가상각"]),
     })),
-    payroll: sheetRows(wb, "payroll").map((r) => ({
+    payroll: sheetRows("payroll").map((r) => ({
       귀속연월: String(r["귀속연월"] ?? ""),
       지급일: toDateStr(r["지급일"]) || String(r["귀속연월"] ?? "") + "-15",
       수령인: String(r["수령인"] ?? ""),
@@ -189,26 +190,21 @@ export function loadLedger(): Ledger {
       지방소득세: toNum(r["지방소득세"]),
       업종: String(r["업종"] ?? ""),
     })),
-    tax_settings: sheetRows(wb, "tax_settings").map((r) => ({
+    tax_settings: sheetRows("tax_settings").map((r) => ({
       항목: String(r["항목"] ?? ""),
       값: String(r["값"] ?? ""),
       설명: String(r["설명"] ?? ""),
     })),
-    income_statement: sheetRows(wb, "01_재무제표") as Array<
-      Record<string, string | number>
-    >,
-    tax_status: sheetMatrix(wb, "02_세금현황") as Array<[string, string | number]>,
   };
 }
 
 // ── 원천세 신고 완료 상태 (wh_filings 탭, 없으면 빈 맵) ────────────
-export function loadFilings(): Record<
-  string,
-  { 신고여부: string; 신고일: string }
+export async function loadFilings(): Promise<
+  Record<string, { 신고여부: string; 신고일: string }>
 > {
-  const wb = readWorkbook();
+  const raw = await getRawRows();
   const out: Record<string, { 신고여부: string; 신고일: string }> = {};
-  for (const r of sheetRows(wb, "wh_filings")) {
+  for (const r of raw["wh_filings"] ?? []) {
     const ym = String(r["귀속월"] ?? "");
     if (!ym) continue;
     out[ym] = {
@@ -357,27 +353,4 @@ export function monthlyRevenue(
   return [...m.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([month, 매출]) => ({ month, 매출 }));
-}
-
-// 02_세금현황 을 라벨→값 맵으로
-export function taxStatusMap(ledger: Ledger): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const row of ledger.tax_status) {
-    if (!row || !row[0]) continue;
-    out[String(row[0])] = toNum(row[1]);
-  }
-  return out;
-}
-
-// 01_재무제표 라벨→{2025,2026}
-export function incomeStatementMap(
-  ledger: Ledger
-): Record<string, { y2025: number; y2026: number }> {
-  const out: Record<string, { y2025: number; y2026: number }> = {};
-  for (const row of ledger.income_statement) {
-    const label = String(row["손익계산서 (단위:원)"] ?? "").trim();
-    if (!label) continue;
-    out[label] = { y2025: toNum(row["2025"]), y2026: toNum(row["2026"]) };
-  }
-  return out;
 }

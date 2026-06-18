@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       if (m.금액 == null) {
         return NextResponse.json({ ok: false, error: "잘못된 요청" }, { status: 400 });
       }
-      const ok = deleteRowByMatch("common_expenses", m);
+      const ok = await deleteRowByMatch("common_expenses", m);
       return NextResponse.json({ ok });
     }
 
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    appendRows("common_expenses", [
+    await appendRows("common_expenses", [
       {
         지출일: String(e.지출일 ?? ""),
         구분: String(e.구분),

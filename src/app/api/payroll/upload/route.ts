@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const ledger = loadLedger();
+    const ledger = await loadLedger();
     const known = new Map(ledger.partners.map((p) => [p.이름, p]));
     const payrollRows: Record<string, string | number>[] = [];
     const newPartnerRows: Record<string, string | number>[] = [];
@@ -88,8 +88,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (newPartnerRows.length > 0) appendRows("partners", newPartnerRows);
-    appendRows("project_costs", payrollRows);
+    if (newPartnerRows.length > 0) await appendRows("partners", newPartnerRows);
+    await appendRows("project_costs", payrollRows);
 
     return NextResponse.json({
       ok: true,

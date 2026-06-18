@@ -10,15 +10,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "귀속월 필요" }, { status: 400 });
     }
     const today = new Date().toISOString().slice(0, 10);
-    const exists = loadFilings()[귀속월] != null;
+    const exists = (await loadFilings())[귀속월] != null;
     const patch = {
       신고여부: filed ? "완료" : "",
       신고일: filed ? today : "",
     };
     if (exists) {
-      updateRow("wh_filings", "귀속월", 귀속월, patch);
+      await updateRow("wh_filings", "귀속월", 귀속월, patch);
     } else {
-      appendRows("wh_filings", [{ 귀속월, ...patch }]);
+      await appendRows("wh_filings", [{ 귀속월, ...patch }]);
     }
     return NextResponse.json({ ok: true });
   } catch (e) {

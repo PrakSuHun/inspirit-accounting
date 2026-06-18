@@ -133,10 +133,6 @@ export type Ledger = {
   bank_transactions: BankTransaction[];
   tax_settings: TaxSetting[];
   payroll: PayrollEntry[]; // 공식 지급명세서 기반 인건비
-
-  // 사람이 만든 요약 탭(라벨/연도 형태) — 원본 그대로 보관
-  income_statement: Array<Record<string, string | number>>; // 01_재무제표
-  tax_status: Array<[string, string | number]>; // 02_세금현황
 };
 
 // 대시보드 집계 결과

@@ -19,8 +19,8 @@ export type ProjectListItem = {
   type: "중개" | "자체제작";
 };
 
-export default function ProjectsPage() {
-  const ledger = loadLedger();
+export default async function ProjectsPage() {
+  const ledger = await loadLedger();
   const rolls = rollupProjects(ledger);
   const items: ProjectListItem[] = rolls.map((r, idx) => ({
     idx,

@@ -16,7 +16,7 @@ export default async function ProjectDetail({
 }) {
   const { idx } = await params;
   const i = Number(idx);
-  const ledger = loadLedger();
+  const ledger = await loadLedger();
   const rolls = rollupProjects(ledger);
   const r = rolls[i];
   if (!r) notFound();
