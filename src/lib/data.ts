@@ -42,7 +42,12 @@ function toDateStr(v: unknown): string {
     const d = String(v.getUTCDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
   }
-  const s = String(v); // 앱이 쓴 문자열 날짜 ("2026-01-01")
+  // 문자열 날짜: "2026-01-01", "2026. 1. 1", "2026/1/1" 등 다양한 형식 처리
+  const s = String(v).trim();
+  const m = s.match(/(\d{4})[.\-/년\s]+(\d{1,2})[.\-/월\s]+(\d{1,2})/);
+  if (m) {
+    return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  }
   return s.length >= 10 ? s.slice(0, 10) : s;
 }
 
