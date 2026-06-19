@@ -1,9 +1,15 @@
 import "server-only";
 import * as XLSX from "xlsx";
 import fs from "node:fs";
+import { clearLedgerCache } from "./data";
 
 const XLSX_PATH = process.env.XLSX_PATH ?? "";
 const useSheets = () => (process.env.DATA_SOURCE ?? "xlsx") === "sheets";
+
+// 쓰기 후 캐시 무효화 → 다음 읽기에 즉시 반영
+function bust() {
+  clearLedgerCache();
+}
 
 function readWb(): XLSX.WorkBook {
   if (!XLSX_PATH || !fs.existsSync(XLSX_PATH)) {
@@ -26,7 +32,9 @@ export async function updateRow(
 ): Promise<boolean> {
   if (useSheets()) {
     const { sheetsUpdateRow } = await import("./sheets");
-    return sheetsUpdateRow(sheetName, keyCol, keyVal, patch);
+    const ok = await sheetsUpdateRow(sheetName, keyCol, keyVal, patch);
+    bust();
+    return ok;
   }
   const wb = readWb();
   const ws = wb.Sheets[sheetName];
@@ -57,7 +65,9 @@ export async function appendRows(
   if (newRows.length === 0) return 0;
   if (useSheets()) {
     const { sheetsAppendRows } = await import("./sheets");
-    return sheetsAppendRows(sheetName, newRows);
+    const n = await sheetsAppendRows(sheetName, newRows);
+    bust();
+    return n;
   }
   const wb = readWb();
   const ws = wb.Sheets[sheetName];
@@ -81,7 +91,9 @@ export async function deleteRowByMatch(
 ): Promise<boolean> {
   if (useSheets()) {
     const { sheetsDeleteRowByMatch } = await import("./sheets");
-    return sheetsDeleteRowByMatch(sheetName, match);
+    const ok = await sheetsDeleteRowByMatch(sheetName, match);
+    bust();
+    return ok;
   }
   const wb = readWb();
   const ws = wb.Sheets[sheetName];

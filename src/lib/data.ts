@@ -53,11 +53,24 @@ function toDateStr(v: unknown): string {
 
 type RawData = Record<string, Record<string, unknown>[]>;
 
+// 구글시트 읽기 캐싱(모듈 메모리, TTL): 매 페이지마다 13탭 재호출 → 쿼터초과 방지 + 속도.
+// 쓰기 시 clearLedgerCache()로 즉시 무효화.
+let _sheetCache: { data: RawData; ts: number } | null = null;
+const CACHE_TTL_MS = 20_000;
+export function clearLedgerCache(): void {
+  _sheetCache = null;
+}
+
 // 데이터 소스 추상화: sheets(클라우드) 또는 xlsx(로컬). 모든 탭을 행객체 배열로.
 async function getRawRows(): Promise<RawData> {
   if ((process.env.DATA_SOURCE ?? "xlsx") === "sheets") {
+    if (_sheetCache && Date.now() - _sheetCache.ts < CACHE_TTL_MS) {
+      return _sheetCache.data;
+    }
     const { sheetsRawRows } = await import("./sheets");
-    return sheetsRawRows();
+    const data = await sheetsRawRows();
+    _sheetCache = { data, ts: Date.now() };
+    return data;
   }
   // 로컬 xlsx (cellDates 안 씀 → 날짜는 serial 로 읽고 변환)
   if (!XLSX_PATH || !fs.existsSync(XLSX_PATH)) {
