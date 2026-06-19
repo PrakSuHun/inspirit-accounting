@@ -7,8 +7,9 @@ export async function POST(req: NextRequest) {
     res.cookies.set("inspirit_auth", process.env.APP_PASSWORD!, {
       httpOnly: true,
       sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: 60 * 60 * 24 * 30, // 30일
+      maxAge: 60 * 60 * 24 * 365, // 1년 (자주 재로그인 안 하게)
     });
     return res;
   }

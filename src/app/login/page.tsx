@@ -17,6 +17,8 @@ function LoginForm() {
   const router = useRouter();
   const sp = useSearchParams();
 
+  const [id, setId] = useState("hyhyxodh");
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -24,7 +26,7 @@ function LoginForm() {
     const res = await fetch("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pw }),
+      body: JSON.stringify({ username: id, password: pw }),
     });
     setLoading(false);
     if (res.ok) {
@@ -39,6 +41,8 @@ function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
       <form
         onSubmit={submit}
+        method="post"
+        action="/api/login"
         className="w-full max-w-sm bg-white rounded-3xl shadow-sm border border-slate-100 p-7"
       >
         <div className="text-2xl font-bold text-slate-900">인스피릿 장부</div>
@@ -46,8 +50,20 @@ function LoginForm() {
           영상·사진 사업 재무 대시보드
         </p>
         <input
+          type="text"
+          name="username"
+          id="username"
+          autoComplete="username"
+          value={id}
+          onChange={(e) => setId(e.target.value)}
+          placeholder="아이디"
+          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2"
+        />
+        <input
           type="password"
-          inputMode="text"
+          name="password"
+          id="password"
+          autoComplete="current-password"
           autoFocus
           value={pw}
           onChange={(e) => setPw(e.target.value)}
