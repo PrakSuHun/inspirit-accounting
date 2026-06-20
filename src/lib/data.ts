@@ -42,8 +42,13 @@ function toDateStr(v: unknown): string {
     const d = String(v.getUTCDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
   }
-  // 문자열 날짜: "2026-01-01", "2026. 1. 1", "2026/1/1" 등 다양한 형식 처리
   const s = String(v).trim();
+  // 순수 숫자 문자열 = 엑셀 serial (구글시트는 날짜를 serial 문자열로 반환)
+  if (/^\d{4,6}(\.\d+)?$/.test(s)) {
+    const n = Number(s);
+    if (n > 20000 && n < 100000) return excelSerialToYMD(n);
+  }
+  // 문자열 날짜: "2026-01-01", "2026. 1. 1", "2026/1/1" 등
   const m = s.match(/(\d{4})[.\-/년\s]+(\d{1,2})[.\-/월\s]+(\d{1,2})/);
   if (m) {
     return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
@@ -198,16 +203,19 @@ export async function loadLedger(): Promise<Ledger> {
       종료일: toDateStr(r["종료일"]),
       월감가상각: toNum(r["월감가상각"]),
     })),
-    payroll: sheetRows("payroll").map((r) => ({
-      귀속연월: String(r["귀속연월"] ?? ""),
-      지급일: toDateStr(r["지급일"]) || String(r["귀속연월"] ?? "") + "-15",
+    payroll: sheetRows("payroll").map((r) => {
+      const ym = toDateStr(r["귀속연월"]).slice(0, 7);
+      return {
+      귀속연월: ym,
+      지급일: toDateStr(r["지급일"]) || ym + "-15",
       수령인: String(r["수령인"] ?? ""),
       주민번호: String(r["주민번호"] ?? ""),
       지급액: toNum(r["지급액"]),
       국세: toNum(r["국세"]),
       지방소득세: toNum(r["지방소득세"]),
       업종: String(r["업종"] ?? ""),
-    })),
+      };
+    }),
     tax_settings: sheetRows("tax_settings").map((r) => ({
       항목: String(r["항목"] ?? ""),
       값: String(r["값"] ?? ""),
