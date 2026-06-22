@@ -7,6 +7,7 @@ import { won } from "@/lib/format";
 
 const 구분옵션 = ["용역비", "경비", "대표인출"];
 const 지급옵션 = ["지급 완료", "일부미지급", "미지급"];
+const 경비분류 = ["교통비", "식대", "장비", "소모품", "숙박", "임차/관리", "기타"];
 
 export default function CostForm({
   project,
@@ -21,6 +22,7 @@ export default function CostForm({
   const [err, setErr] = useState("");
   const [c, setC] = useState({
     구분: "용역비",
+    분류: "교통비", // 경비 분류(드롭다운)
     내용: "",
     금액: "",
     파트너: "",
@@ -28,6 +30,17 @@ export default function CostForm({
     지급여부: "지급 완료",
     선금여부: false,
   });
+
+  const reset = {
+    구분: "용역비",
+    분류: "교통비",
+    내용: "",
+    금액: "",
+    파트너: "",
+    지출일: "",
+    지급여부: "지급 완료",
+    선금여부: false,
+  };
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,6 +50,11 @@ export default function CostForm({
     }
     setSaving(true);
     setErr("");
+    // 경비는 "분류 · 메모"로 합쳐 저장 (분류가 앞)
+    const 내용 =
+      c.구분 === "경비"
+        ? c.분류 + (c.내용 ? ` · ${c.내용}` : "")
+        : c.내용;
     const res = await fetch("/api/costs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -45,7 +63,7 @@ export default function CostForm({
         cost: {
           프로젝트: project,
           구분: c.구분,
-          내용: c.내용,
+          내용,
           금액: Number(c.금액),
           파트너: c.파트너,
           지출일: c.지출일,
@@ -57,15 +75,7 @@ export default function CostForm({
     const json = await res.json();
     setSaving(false);
     if (json.ok) {
-      setC({
-        구분: "용역비",
-        내용: "",
-        금액: "",
-        파트너: "",
-        지출일: "",
-        지급여부: "지급 완료",
-        선금여부: false,
-      });
+      setC(reset);
       setOpen(false);
       router.refresh();
     } else {
@@ -143,18 +153,34 @@ export default function CostForm({
         </div>
       )}
 
-      <input
-        value={c.내용}
-        onChange={(e) => setC((p) => ({ ...p, 내용: e.target.value }))}
-        placeholder={
-          c.구분 === "용역비"
-            ? "내용 (예: 영상 편집)"
-            : c.구분 === "대표인출"
-            ? "메모 (선택)"
-            : "항목 (예: 장비·교통·식대)"
-        }
-        className="cinp"
-      />
+      {c.구분 === "경비" ? (
+        <>
+          <select
+            value={c.분류}
+            onChange={(e) => setC((p) => ({ ...p, 분류: e.target.value }))}
+            className="cinp"
+          >
+            {경비분류.map((o) => (
+              <option key={o}>{o}</option>
+            ))}
+          </select>
+          <input
+            value={c.내용}
+            onChange={(e) => setC((p) => ({ ...p, 내용: e.target.value }))}
+            placeholder="메모 (선택, 예: 강남 미팅 택시)"
+            className="cinp"
+          />
+        </>
+      ) : (
+        <input
+          value={c.내용}
+          onChange={(e) => setC((p) => ({ ...p, 내용: e.target.value }))}
+          placeholder={
+            c.구분 === "용역비" ? "내용 (예: 영상 편집)" : "메모 (선택)"
+          }
+          className="cinp"
+        />
+      )}
 
       <MoneyInput
         value={Number(c.금액) || 0}
