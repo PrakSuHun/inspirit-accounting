@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, X } from "lucide-react";
 import MoneyInput from "./MoneyInput";
+import { won } from "@/lib/format";
 
 const 구분옵션 = ["용역비", "경비", "대표인출"];
 const 지급옵션 = ["지급 완료", "일부미지급", "미지급"];
@@ -106,7 +107,14 @@ export default function CostForm({
           <button
             key={g}
             type="button"
-            onClick={() => setC((p) => ({ ...p, 구분: g }))}
+            onClick={() =>
+              setC((p) => ({
+                ...p,
+                구분: g,
+                // 대표인출=박수훈 고정, 경비=파트너 없음, 용역비=직접 선택
+                파트너: g === "대표인출" ? "박수훈" : g === "경비" ? "" : p.파트너,
+              }))
+            }
             className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition ${
               c.구분 === g
                 ? "bg-indigo-600 text-white"
@@ -118,28 +126,52 @@ export default function CostForm({
         ))}
       </div>
 
-      <input
-        value={c.내용}
-        onChange={(e) => setC((p) => ({ ...p, 내용: e.target.value }))}
-        placeholder="내용 (예: 인건비, 교통비)"
-        className="cinp"
-      />
-
-      <div className="grid grid-cols-2 gap-2">
-        <MoneyInput
-          value={Number(c.금액) || 0}
-          onChange={(n) => setC((p) => ({ ...p, 금액: n ? String(n) : "" }))}
-          placeholder="금액"
-          className="cinp"
-        />
+      {/* 용역비: 프리랜서 수령인 (원천세 자동) */}
+      {c.구분 === "용역비" && (
         <input
           list="partners-list"
           value={c.파트너}
           onChange={(e) => setC((p) => ({ ...p, 파트너: e.target.value }))}
-          placeholder="파트너 (외주)"
+          placeholder="수령인 (프리랜서/외주)"
           className="cinp"
         />
-      </div>
+      )}
+      {/* 대표인출: 박수훈 고정 안내 */}
+      {c.구분 === "대표인출" && (
+        <div className="rounded-lg bg-white border border-slate-200 px-3 py-2 text-xs text-slate-500">
+          대표(박수훈) 인출 — 회사 돈을 대표가 가져가는 것
+        </div>
+      )}
+
+      <input
+        value={c.내용}
+        onChange={(e) => setC((p) => ({ ...p, 내용: e.target.value }))}
+        placeholder={
+          c.구분 === "용역비"
+            ? "내용 (예: 영상 편집)"
+            : c.구분 === "대표인출"
+            ? "메모 (선택)"
+            : "항목 (예: 장비·교통·식대)"
+        }
+        className="cinp"
+      />
+
+      <MoneyInput
+        value={Number(c.금액) || 0}
+        onChange={(n) => setC((p) => ({ ...p, 금액: n ? String(n) : "" }))}
+        placeholder="금액"
+        className="cinp"
+      />
+
+      {/* 용역비면 원천세 미리보기 */}
+      {c.구분 === "용역비" && Number(c.금액) > 0 && (
+        <p className="text-[11px] text-slate-500 -mt-1">
+          원천세 3.3% {won(Math.floor((Number(c.금액) * 0.033) / 10) * 10)} → 실지급{" "}
+          {won(
+            Number(c.금액) - Math.floor((Number(c.금액) * 0.033) / 10) * 10
+          )}
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-2">
         <input
