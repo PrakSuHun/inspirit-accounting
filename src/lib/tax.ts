@@ -78,13 +78,17 @@ export type WithholdingPayment = {
   실지급액: number;
   프로젝트: string;
   내용: string; // 삭제 매칭용
+  출처: "project" | "payroll"; // project=앱에서 기록(삭제가능) / payroll=공식 지급명세서(시트수정)
 };
 
-// 인건비 탭 = 프로젝트에 기록한 용역비(프리랜서 지급분) 기준 = 실제 지급 기록. (최신순)
-// (세금 탭 공제는 별도로 공식 지급명세서 기준 — deductibleByYear 참고)
+// 인건비 탭 = ① 프로젝트에 기록한 용역비(project_costs) + ② 공식 지급명세서(payroll).
+// 같은 (수령인+귀속월)은 한 번만 — project_costs 우선, payroll 보충. (중복 집계 방지)
+// → 행사도우미/배당처럼 프로젝트 무관 정기지급(장우인·고경석 등)도 빠짐없이 표시.
 export function withholdingPayments(ledger: Ledger): WithholdingPayment[] {
   const fl = freelancerSet(ledger);
-  return ledger.project_costs
+
+  // ① 프로젝트 기록 용역비
+  const fromCosts: WithholdingPayment[] = ledger.project_costs
     .filter((c) => c.구분 === "용역비" && fl.has(c.파트너) && c.지출일)
     .map((c) => {
       const 국세 = Math.floor((c.금액 * 국세율) / 10) * 10;
@@ -100,9 +104,41 @@ export function withholdingPayments(ledger: Ledger): WithholdingPayment[] {
         실지급액: c.금액 - 국세 - 지방,
         프로젝트: c.프로젝트,
         내용: c.내용,
+        출처: "project" as const,
       };
-    })
-    .sort((a, b) => String(b.지급일).localeCompare(String(a.지급일)));
+    });
+
+  // ② 공식 지급명세서(payroll) 중 ①에 없는 (수령인+월)만 보충
+  const seen = new Set(fromCosts.map((p) => `${p.수령인}|${p.귀속연월}`));
+  const fromPayroll: WithholdingPayment[] = ledger.payroll
+    .filter(
+      (p) =>
+        p.수령인 &&
+        p.귀속연월 &&
+        p.지급액 > 0 &&
+        !seen.has(`${p.수령인}|${p.귀속연월}`)
+    )
+    .map((p) => {
+      const 국세 = p.국세 || Math.floor((p.지급액 * 국세율) / 10) * 10;
+      const 지방 = p.지방소득세 || Math.floor((p.지급액 * 지방세율) / 10) * 10;
+      return {
+        지급일: p.지급일,
+        귀속연월: p.귀속연월,
+        수령인: p.수령인,
+        지급총액: p.지급액,
+        국세,
+        지방소득세: 지방,
+        원천세합: 국세 + 지방,
+        실지급액: p.지급액 - 국세 - 지방,
+        프로젝트: p.업종 ? `지급명세서 · ${p.업종}` : "지급명세서",
+        내용: p.업종 ?? "",
+        출처: "payroll" as const,
+      };
+    });
+
+  return [...fromCosts, ...fromPayroll].sort((a, b) =>
+    String(b.지급일).localeCompare(String(a.지급일))
+  );
 }
 
 export type WithholdingMonthly = {

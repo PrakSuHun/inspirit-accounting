@@ -24,6 +24,7 @@ type Payment = {
   실지급액: number;
   프로젝트: string;
   내용: string;
+  출처: "project" | "payroll";
 };
 
 type PersonAgg = {
@@ -254,15 +255,24 @@ export default function Payroll({
                                 원천세 {won(pay.원천세합)}
                               </div>
                             </div>
-                            <button
-                              onClick={() => del(pay)}
-                              disabled={
-                                delKey === pay.지급일 + pay.수령인 + pay.지급총액
-                              }
-                              className="text-slate-300 hover:text-rose-500"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            {pay.출처 === "payroll" ? (
+                              <span
+                                title="공식 지급명세서 — 시트에서 수정"
+                                className="text-[9px] text-slate-400 border border-slate-200 rounded px-1 py-0.5 shrink-0"
+                              >
+                                공식
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => del(pay)}
+                                disabled={
+                                  delKey === pay.지급일 + pay.수령인 + pay.지급총액
+                                }
+                                className="text-slate-300 hover:text-rose-500"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}

@@ -1,41 +1,25 @@
 import { NextResponse } from "next/server";
 import { loadLedger } from "@/lib/data";
-import { freelancerSet } from "@/lib/tax";
+import { withholdingPayments } from "@/lib/tax";
 
-// 임시 진단: payroll vs project_costs 용역비 겹침 확인
+// 임시 진단: 병합 후 인건비에 장우인 등 payroll 출처가 뜨는지 확인
 export async function GET() {
   try {
     const l = await loadLedger();
-    const fl = [...freelancerSet(l)];
-    const payroll = l.payroll.map((p) => ({
-      수령인: p.수령인,
-      귀속연월: p.귀속연월,
-      지급액: p.지급액,
-      업종: p.업종,
-    }));
-    const pc = l.project_costs
-      .filter((c) => c.구분 === "용역비")
-      .map((c) => ({
-        파트너: c.파트너,
-        월: String(c.지출일).slice(0, 7),
-        금액: c.금액,
-        프로젝트: c.프로젝트,
-        isFreelancer: freelancerSet(l).has(c.파트너),
-      }));
-    // 사람별 비교
-    const payByPerson: Record<string, number> = {};
-    for (const p of payroll) payByPerson[p.수령인] = (payByPerson[p.수령인] ?? 0) + 1;
-    const pcByPerson: Record<string, number> = {};
-    for (const c of pc) pcByPerson[c.파트너] = (pcByPerson[c.파트너] ?? 0) + 1;
+    const wh = withholdingPayments(l);
+    const 인별: Record<string, { 건수: number; 출처: string[] }> = {};
+    for (const p of wh) {
+      const r = (인별[p.수령인] ??= { 건수: 0, 출처: [] });
+      r.건수++;
+      if (!r.출처.includes(p.출처)) r.출처.push(p.출처);
+    }
     return NextResponse.json({
       ok: true,
-      freelancerSet: fl,
-      payroll_건수: payroll.length,
-      payroll_인별: payByPerson,
-      payroll: payroll.sort((a, b) => a.수령인.localeCompare(b.수령인)),
-      projectcost용역비_인별: pcByPerson,
-      장우인_payroll: payroll.filter((p) => p.수령인 === "장우인"),
-      장우인_projectcost: pc.filter((c) => c.파트너 === "장우인"),
+      총건수: wh.length,
+      인별,
+      장우인: wh
+        .filter((p) => p.수령인 === "장우인")
+        .map((p) => ({ 월: p.귀속연월, 금액: p.지급총액, 출처: p.출처 })),
     });
   } catch (e) {
     const err = e as Error;
