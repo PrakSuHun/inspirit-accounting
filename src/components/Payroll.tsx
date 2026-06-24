@@ -381,11 +381,12 @@ function AddPayment({
   projects: string[];
 }) {
   const router = useRouter();
+  const today = new Date().toISOString().slice(0, 10);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [f, setF] = useState({
-    지급일: "",
+    지급일: today,
     수령인: "",
     주민번호: "",
     금액: "",
@@ -402,6 +403,10 @@ function AddPayment({
       setErr("수령인과 금액은 필수입니다.");
       return;
     }
+    if (!f.지급일) {
+      setErr("지급일을 입력하세요. 날짜가 없으면 인건비 목록에 안 떠요.");
+      return;
+    }
     setSaving(true);
     setErr("");
     const res = await fetch("/api/payroll", {
@@ -412,7 +417,7 @@ function AddPayment({
     const json = await res.json();
     setSaving(false);
     if (json.ok) {
-      setF({ 지급일: "", 수령인: "", 주민번호: "", 금액: "", 프로젝트: "" });
+      setF({ 지급일: today, 수령인: "", 주민번호: "", 금액: "", 프로젝트: "" });
       setOpen(false);
       router.refresh();
     } else setErr(json.error || "저장 실패");

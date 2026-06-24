@@ -17,6 +17,8 @@ export default function CostForm({
   partners: string[];
 }) {
   const router = useRouter();
+  // 지출일 기본값 = 오늘 (비우면 인건비 탭에 안 떠서 필수로)
+  const today = new Date().toISOString().slice(0, 10);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -26,7 +28,7 @@ export default function CostForm({
     내용: "",
     금액: "",
     파트너: "",
-    지출일: "",
+    지출일: today,
     지급여부: "지급 완료",
     선금여부: false,
   });
@@ -37,7 +39,7 @@ export default function CostForm({
     내용: "",
     금액: "",
     파트너: "",
-    지출일: "",
+    지출일: today,
     지급여부: "지급 완료",
     선금여부: false,
   };
@@ -46,6 +48,14 @@ export default function CostForm({
     e.preventDefault();
     if (!c.금액) {
       setErr("금액을 입력하세요.");
+      return;
+    }
+    if (!c.지출일) {
+      setErr("지출일(날짜)을 입력하세요. 날짜가 없으면 인건비 탭에 안 떠요.");
+      return;
+    }
+    if (c.구분 === "용역비" && !c.파트너.trim()) {
+      setErr("용역비는 수령인을 입력하세요.");
       return;
     }
     setSaving(true);
