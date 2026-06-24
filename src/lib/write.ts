@@ -1,15 +1,9 @@
 import "server-only";
 import * as XLSX from "xlsx";
 import fs from "node:fs";
-import { clearLedgerCache } from "./data";
 
 const XLSX_PATH = process.env.XLSX_PATH ?? "";
 const useSheets = () => (process.env.DATA_SOURCE ?? "xlsx") === "sheets";
-
-// 쓰기 후 캐시 무효화 → 다음 읽기에 즉시 반영
-function bust() {
-  clearLedgerCache();
-}
 
 function readWb(): XLSX.WorkBook {
   if (!XLSX_PATH || !fs.existsSync(XLSX_PATH)) {
@@ -33,7 +27,6 @@ export async function updateRow(
   if (useSheets()) {
     const { sheetsUpdateRow } = await import("./sheets");
     const ok = await sheetsUpdateRow(sheetName, keyCol, keyVal, patch);
-    bust();
     return ok;
   }
   const wb = readWb();
@@ -66,7 +59,6 @@ export async function appendRows(
   if (useSheets()) {
     const { sheetsAppendRows } = await import("./sheets");
     const n = await sheetsAppendRows(sheetName, newRows);
-    bust();
     return n;
   }
   const wb = readWb();
@@ -92,7 +84,6 @@ export async function deleteRowByMatch(
   if (useSheets()) {
     const { sheetsDeleteRowByMatch } = await import("./sheets");
     const ok = await sheetsDeleteRowByMatch(sheetName, match);
-    bust();
     return ok;
   }
   const wb = readWb();

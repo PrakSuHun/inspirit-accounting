@@ -44,27 +44,69 @@ async function getDoc(): Promise<GoogleSpreadsheet> {
   return doc;
 }
 
-// 모든 탭을 {탭명: 행객체[]} 로 (병렬 로드)
+async function getToken(): Promise<string> {
+  const auth = getAuth();
+  await auth.authorize();
+  const t = auth.credentials.access_token;
+  if (!t) throw new Error("구글 인증 토큰 발급 실패");
+  return t;
+}
+
+// 모든 탭을 한 번의 batchGet 으로 로드 (호출수 14→2, 쿼터 안전 + 캐시 불필요).
+// UNFORMATTED_VALUE: 날짜=serial숫자, 금액=숫자 (toDateStr/toNum이 처리)
 export async function sheetsRawRows(): Promise<
   Record<string, Record<string, unknown>[]>
 > {
-  const doc = await getDoc();
+  const id = process.env.GOOGLE_SHEET_ID;
+  if (!id) throw new Error("GOOGLE_SHEET_ID 환경변수가 없습니다.");
+  const token = await getToken();
+  const headers = { Authorization: `Bearer ${token}` };
+
+  // 1) 존재하는 시트 목록
+  const metaRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties.title`,
+    { headers }
+  );
+  if (!metaRes.ok)
+    throw new Error(`Sheets meta ${metaRes.status}: ${await metaRes.text()}`);
+  const meta = await metaRes.json();
+  const existing = new Set<string>(
+    (meta.sheets ?? []).map(
+      (s: { properties: { title: string } }) => s.properties.title
+    )
+  );
+  const tabs = SHEET_TABS.filter((t) => existing.has(t));
+
   const out: Record<string, Record<string, unknown>[]> = {};
-  await Promise.all(
-    SHEET_TABS.map(async (name) => {
-      const sheet = doc.sheetsByTitle[name];
-      if (!sheet) {
-        out[name] = [];
-        return;
-      }
-      const rows = await sheet.getRows();
-      const headers = sheet.headerValues ?? [];
-      out[name] = rows.map((r) => {
+  for (const t of SHEET_TABS) out[t] = [];
+  if (tabs.length === 0) return out;
+
+  // 2) 한 번에 모든 탭 값 가져오기
+  const qs =
+    tabs.map((t) => `ranges=${encodeURIComponent(t)}`).join("&") +
+    "&valueRenderOption=UNFORMATTED_VALUE";
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchGet?${qs}`,
+    { headers }
+  );
+  if (!res.ok)
+    throw new Error(`Sheets batchGet ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+
+  (data.valueRanges ?? []).forEach(
+    (vr: { values?: unknown[][] }, i: number) => {
+      const t = tabs[i];
+      const values = vr.values ?? [];
+      if (values.length === 0) return;
+      const hdr = (values[0] as unknown[]).map((h) => String(h));
+      out[t] = values.slice(1).map((row) => {
         const obj: Record<string, unknown> = {};
-        for (const h of headers) obj[h] = r.get(h);
+        hdr.forEach((h, j) => {
+          obj[h] = (row as unknown[])[j] ?? "";
+        });
         return obj;
       });
-    })
+    }
   );
   return out;
 }
