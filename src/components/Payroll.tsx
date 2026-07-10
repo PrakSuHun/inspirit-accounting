@@ -542,7 +542,7 @@ function AddPayment({
       <Typeahead
         value={f.프로젝트}
         onChange={(v) => setF({ ...f, 프로젝트: v })}
-        options={projects}
+        options={[...projects].reverse()}
         placeholder="연결 프로젝트(선택)"
       />
       {금액n > 0 && (
@@ -558,7 +558,7 @@ function AddPayment({
       >
         {saving ? "저장 중…" : "기록 추가"}
       </button>
-      <style>{`.pinp{width:100%;border-radius:0.625rem;border:1px solid #e2e8f0;background:#fff;padding:0.5rem 0.75rem;font-size:0.9rem}.pinp:focus{outline:none;box-shadow:0 0 0 2px #6366f1}`}</style>
+      <style>{`.pinp{box-sizing:border-box;width:100%;border-radius:0.625rem;border:1px solid #e2e8f0;background:#fff;padding:0.5rem 0.75rem;font-size:0.9rem;line-height:1.4;font-family:inherit;-webkit-appearance:none;appearance:none}.pinp:focus{outline:none;box-shadow:0 0 0 2px #6366f1}input[type="date"].pinp::-webkit-date-and-time-value{text-align:left;margin:0}input[type="date"].pinp::-webkit-calendar-picker-indicator{margin:0;padding:0}`}</style>
     </form>
   );
 }
