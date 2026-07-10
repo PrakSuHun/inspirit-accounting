@@ -20,6 +20,8 @@ type Payment = {
   귀속연월: string;
   수령인: string;
   지급총액: number;
+  국세: number;
+  지방소득세: number;
   원천세합: number;
   실지급액: number;
   프로젝트: string;
@@ -31,7 +33,8 @@ type PersonAgg = {
   수령인: string;
   지급총액: number;
   실지급액: number;
-  원천세: number;
+  국세: number;
+  지방소득세: number;
   pays: Payment[];
 };
 
@@ -79,21 +82,30 @@ export default function Payroll({
     (a, p) => ({
       지급총액: a.지급총액 + p.지급총액,
       실지급액: a.실지급액 + p.실지급액,
-      원천세: a.원천세 + p.원천세합,
+      국세: a.국세 + p.국세,
+      지방소득세: a.지방소득세 + p.지방소득세,
     }),
-    { 지급총액: 0, 실지급액: 0, 원천세: 0 }
+    { 지급총액: 0, 실지급액: 0, 국세: 0, 지방소득세: 0 }
   );
   const byPerson: PersonAgg[] = useMemo(() => {
     const m = new Map<string, PersonAgg>();
     for (const p of monthPays) {
       let r = m.get(p.수령인);
       if (!r) {
-        r = { 수령인: p.수령인, 지급총액: 0, 실지급액: 0, 원천세: 0, pays: [] };
+        r = {
+          수령인: p.수령인,
+          지급총액: 0,
+          실지급액: 0,
+          국세: 0,
+          지방소득세: 0,
+          pays: [],
+        };
         m.set(p.수령인, r);
       }
       r.지급총액 += p.지급총액;
       r.실지급액 += p.실지급액;
-      r.원천세 += p.원천세합;
+      r.국세 += p.국세;
+      r.지방소득세 += p.지방소득세;
       r.pays.push(p);
     }
     return [...m.values()].sort((a, b) => b.지급총액 - a.지급총액);
@@ -199,14 +211,18 @@ export default function Payroll({
             </div>
           )}
           <div className="text-3xl font-bold mt-1.5">{won(sum.지급총액)}</div>
-          <div className="flex gap-4 mt-3 text-sm">
+          <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3 text-sm">
             <div>
               <div className="opacity-75 text-xs">실지급액</div>
               <div className="font-semibold">{won(sum.실지급액)}</div>
             </div>
             <div>
-              <div className="opacity-75 text-xs">원천세</div>
-              <div className="font-semibold">{won(sum.원천세)}</div>
+              <div className="opacity-75 text-xs">원천세 (국세 3%)</div>
+              <div className="font-semibold">{won(sum.국세)}</div>
+            </div>
+            <div>
+              <div className="opacity-75 text-xs">지방소득세 (0.3%)</div>
+              <div className="font-semibold">{won(sum.지방소득세)}</div>
             </div>
             <div>
               <div className="opacity-75 text-xs">인원</div>
@@ -244,7 +260,8 @@ export default function Payroll({
                       {won(p.지급총액)}
                     </div>
                     <div className="text-[11px] text-slate-400">
-                      실지급 {won(p.실지급액)} · 원천세 {won(p.원천세)}
+                      실지급 {won(p.실지급액)} · 원천세 {won(p.국세)} · 지방세{" "}
+                      {won(p.지방소득세)}
                     </div>
                   </div>
                 </button>
@@ -275,7 +292,8 @@ export default function Payroll({
                                 {won(pay.지급총액)}
                               </div>
                               <div className="text-[10px] text-slate-400">
-                                원천세 {won(pay.원천세합)}
+                                원천세 {won(pay.국세)} · 지방세{" "}
+                                {won(pay.지방소득세)}
                               </div>
                             </div>
                             {pay.출처 === "payroll" ? (
