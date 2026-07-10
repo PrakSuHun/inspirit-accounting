@@ -9,29 +9,71 @@ const 구분옵션 = ["용역비", "경비", "대표인출"];
 const 지급옵션 = ["지급 완료", "일부미지급", "미지급"];
 const 경비분류 = ["교통비", "식대", "장비", "소모품", "숙박", "임차/관리", "기타"];
 
+export type EditCost = {
+  구분: string;
+  지출일: string;
+  내용: string;
+  금액: number;
+  파트너: string;
+  지급여부: string;
+  선금여부: string;
+};
+
 export default function CostForm({
   project,
   partners,
+  edit,
+  onClose,
 }: {
   project: string;
   partners: string[];
+  edit?: EditCost; // 있으면 수정 모드
+  onClose?: () => void;
 }) {
   const router = useRouter();
   // 지출일 기본값 = 오늘 (비우면 인건비 탭에 안 떠서 필수로)
   const today = new Date().toISOString().slice(0, 10);
-  const [open, setOpen] = useState(false);
+  const isEdit = !!edit;
+
+  // 경비는 "분류 · 메모"로 저장 → 수정 시 되돌려 파싱
+  const initFromEdit = () => {
+    if (!edit) {
+      return {
+        구분: "용역비",
+        분류: "교통비",
+        내용: "",
+        금액: "",
+        파트너: "",
+        지출일: today,
+        지급여부: "지급 완료",
+        선금여부: false,
+      };
+    }
+    let 분류 = "교통비";
+    let 내용 = edit.내용;
+    if (edit.구분 === "경비") {
+      const parts = edit.내용.split(" · ");
+      if (경비분류.includes(parts[0])) {
+        분류 = parts[0];
+        내용 = parts.slice(1).join(" · ");
+      }
+    }
+    return {
+      구분: edit.구분 || "경비",
+      분류,
+      내용,
+      금액: String(edit.금액 ?? ""),
+      파트너: edit.파트너 || "",
+      지출일: edit.지출일 || today,
+      지급여부: edit.지급여부 || "지급 완료",
+      선금여부: !!edit.선금여부,
+    };
+  };
+
+  const [open, setOpen] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
-  const [c, setC] = useState({
-    구분: "용역비",
-    분류: "교통비", // 경비 분류(드롭다운)
-    내용: "",
-    금액: "",
-    파트너: "",
-    지출일: today,
-    지급여부: "지급 완료",
-    선금여부: false,
-  });
+  const [c, setC] = useState(initFromEdit);
 
   const reset = {
     구분: "용역비",
@@ -65,28 +107,43 @@ export default function CostForm({
       c.구분 === "경비"
         ? c.분류 + (c.내용 ? ` · ${c.내용}` : "")
         : c.내용;
+    const newCost = {
+      프로젝트: project,
+      구분: c.구분,
+      내용,
+      금액: Number(c.금액),
+      파트너: c.파트너,
+      지출일: c.지출일,
+      지급여부: c.지급여부,
+      선금여부: c.선금여부 ? "선금" : "",
+    };
     const res = await fetch("/api/costs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "create",
-        cost: {
-          프로젝트: project,
-          구분: c.구분,
-          내용,
-          금액: Number(c.금액),
-          파트너: c.파트너,
-          지출일: c.지출일,
-          지급여부: c.지급여부,
-          선금여부: c.선금여부 ? "선금" : "",
-        },
-      }),
+      body: JSON.stringify(
+        isEdit
+          ? {
+              action: "update",
+              match: {
+                프로젝트: project,
+                지출일: edit!.지출일,
+                내용: edit!.내용,
+                금액: edit!.금액,
+              },
+              cost: newCost,
+            }
+          : { action: "create", cost: newCost }
+      ),
     });
-    const json = await res.json();
+    const json = await res.json().catch(() => ({ ok: res.ok }));
     setSaving(false);
-    if (json.ok) {
-      setC(reset);
-      setOpen(false);
+    if (res.ok && json.ok) {
+      if (isEdit) {
+        onClose?.();
+      } else {
+        setC(reset);
+        setOpen(false);
+      }
       router.refresh();
     } else {
       setErr(json.error || "저장 실패");
@@ -116,8 +173,13 @@ export default function CostForm({
       </datalist>
 
       <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-slate-700">지출 추가</span>
-        <button type="button" onClick={() => setOpen(false)}>
+        <span className="text-sm font-semibold text-slate-700">
+          {isEdit ? "지출 수정" : "지출 추가"}
+        </span>
+        <button
+          type="button"
+          onClick={() => (isEdit ? onClose?.() : setOpen(false))}
+        >
           <X size={18} className="text-slate-400" />
         </button>
       </div>
@@ -243,7 +305,7 @@ export default function CostForm({
         disabled={saving}
         className="w-full rounded-xl bg-indigo-600 text-white py-2.5 font-semibold disabled:opacity-50"
       >
-        {saving ? "저장 중…" : "추가"}
+        {saving ? "저장 중…" : isEdit ? "저장" : "추가"}
       </button>
 
       <style>{`.cinp{width:100%;border-radius:0.625rem;border:1px solid #e2e8f0;background:#fff;padding:0.5rem 0.75rem;font-size:0.9rem}.cinp:focus{outline:none;box-shadow:0 0 0 2px #6366f1}`}</style>

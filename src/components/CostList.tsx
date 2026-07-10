@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { Trash2, Pencil } from "lucide-react";
 import { won } from "@/lib/format";
 import CostForm from "./CostForm";
 
@@ -26,6 +26,7 @@ export default function CostList({
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [editing, setEditing] = useState<CostRow | null>(null);
 
   async function del(c: CostRow, i: number) {
     if (!confirm(`"${c.내용 || c.구분} ${won(c.금액)}" 지출을 삭제할까요?`)) return;
@@ -81,9 +82,17 @@ export default function CostList({
                 </div>
               </div>
               <button
+                onClick={() => setEditing(c)}
+                className="text-slate-300 hover:text-indigo-500"
+                title="수정"
+              >
+                <Pencil size={15} />
+              </button>
+              <button
                 onClick={() => del(c, i)}
                 disabled={deleting === i}
                 className="text-slate-300 hover:text-rose-500 disabled:opacity-40"
+                title="삭제"
               >
                 <Trash2 size={15} />
               </button>
@@ -95,6 +104,22 @@ export default function CostList({
         )}
       </div>
       <CostForm project={project} partners={partners} />
+
+      {editing && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          onClick={() => setEditing(null)}
+        >
+          <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <CostForm
+              project={project}
+              partners={partners}
+              edit={editing}
+              onClose={() => setEditing(null)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

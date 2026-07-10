@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
         금액: Number(p.금액) || 0,
         파트너: 수령인,
         지급여부: "지급 완료",
-        선금여부: "",
+        선금여부: p.선금여부 ? "선금" : "",
       },
     ]);
     return NextResponse.json({ ok: true });

@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { won, manwon } from "@/lib/format";
 import { Card, SectionTitle } from "@/components/ui";
-import { Plus, X, Download, Trash2, ChevronDown } from "lucide-react";
+import { Plus, X, Download, Trash2, ChevronDown, Pencil } from "lucide-react";
 import MoneyInput from "./MoneyInput";
 
 type FilingRow = {
@@ -26,6 +26,8 @@ type Payment = {
   실지급액: number;
   프로젝트: string;
   내용: string;
+  선금여부: string;
+  지급여부: string;
   출처: "project" | "payroll";
 };
 
@@ -58,6 +60,7 @@ export default function Payroll({
   const [delKey, setDelKey] = useState<string | null>(null);
   const [openPerson, setOpenPerson] = useState<string | null>(null);
   const [showYear, setShowYear] = useState<"2025" | "2026">("2026");
+  const [editing, setEditing] = useState<Payment | null>(null);
 
   const overdue = schedule.filter((s) => s.status === "지연");
   const scheduleMap = new Map(schedule.map((s) => [s.귀속연월, s]));
@@ -271,52 +274,73 @@ export default function Payroll({
                     {p.pays
                       .slice()
                       .sort((a, b) => b.지급일.localeCompare(a.지급일))
-                      .map((pay, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between text-sm py-1"
-                        >
-                          <div className="min-w-0">
-                            <div className="text-slate-700 truncate">
-                              {pay.프로젝트 && pay.프로젝트 !== "인건비"
-                                ? pay.프로젝트
-                                : "인건비"}
+                      .map((pay, i) => {
+                        const 선금 = !!pay.선금여부;
+                        return (
+                          <div
+                            key={i}
+                            className={`flex items-center justify-between text-sm py-1 px-2 -mx-2 rounded-lg ${
+                              선금 ? "bg-amber-50" : ""
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <div className="text-slate-700 truncate flex items-center gap-1.5">
+                                {pay.프로젝트 && pay.프로젝트 !== "인건비"
+                                  ? pay.프로젝트
+                                  : "인건비"}
+                                {선금 && (
+                                  <span className="text-[9px] font-semibold text-amber-700 bg-amber-100 border border-amber-300 rounded px-1 py-0.5 shrink-0">
+                                    선금
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-400">
+                                {pay.지급일}
+                              </div>
                             </div>
-                            <div className="text-[11px] text-slate-400">
-                              {pay.지급일}
+                            <div className="flex items-center gap-2 shrink-0">
+                              <div className="text-right">
+                                <div className="text-slate-700">
+                                  {won(pay.지급총액)}
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  원천세 {won(pay.국세)} · 지방세{" "}
+                                  {won(pay.지방소득세)}
+                                </div>
+                              </div>
+                              {pay.출처 === "payroll" ? (
+                                <span
+                                  title="공식 지급명세서 — 시트에서 수정"
+                                  className="text-[9px] text-slate-400 border border-slate-200 rounded px-1 py-0.5 shrink-0"
+                                >
+                                  공식
+                                </span>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => setEditing(pay)}
+                                    className="text-slate-300 hover:text-indigo-500"
+                                    title="수정"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => del(pay)}
+                                    disabled={
+                                      delKey ===
+                                      pay.지급일 + pay.수령인 + pay.지급총액
+                                    }
+                                    className="text-slate-300 hover:text-rose-500"
+                                    title="삭제"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <div className="text-right">
-                              <div className="text-slate-700">
-                                {won(pay.지급총액)}
-                              </div>
-                              <div className="text-[10px] text-slate-400">
-                                원천세 {won(pay.국세)} · 지방세{" "}
-                                {won(pay.지방소득세)}
-                              </div>
-                            </div>
-                            {pay.출처 === "payroll" ? (
-                              <span
-                                title="공식 지급명세서 — 시트에서 수정"
-                                className="text-[9px] text-slate-400 border border-slate-200 rounded px-1 py-0.5 shrink-0"
-                              >
-                                공식
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => del(pay)}
-                                disabled={
-                                  delKey === pay.지급일 + pay.수령인 + pay.지급총액
-                                }
-                                className="text-slate-300 hover:text-rose-500"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 )}
               </Card>
@@ -399,6 +423,15 @@ export default function Payroll({
           </a>
         </div>
       </div>
+
+      {editing && (
+        <EditPayment
+          pay={editing}
+          freelancers={freelancers}
+          projects={projects}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   );
 }
@@ -476,6 +509,7 @@ function AddPayment({
     주민번호: "",
     금액: "",
     프로젝트: "",
+    선금: false,
   });
 
   const 금액n = Number(f.금액) || 0;
@@ -497,12 +531,22 @@ function AddPayment({
     const res = await fetch("/api/payroll", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "add", payment: f }),
+      body: JSON.stringify({
+        action: "add",
+        payment: { ...f, 선금여부: f.선금 },
+      }),
     });
     const json = await res.json();
     setSaving(false);
     if (json.ok) {
-      setF({ 지급일: today, 수령인: "", 주민번호: "", 금액: "", 프로젝트: "" });
+      setF({
+        지급일: today,
+        수령인: "",
+        주민번호: "",
+        금액: "",
+        프로젝트: "",
+        선금: false,
+      });
       setOpen(false);
       router.refresh();
     } else setErr(json.error || "저장 실패");
@@ -565,6 +609,15 @@ function AddPayment({
         options={[...projects].reverse()}
         placeholder="연결 프로젝트(선택)"
       />
+      <label className="flex items-center gap-2 text-sm text-slate-600 select-none">
+        <input
+          type="checkbox"
+          checked={f.선금}
+          onChange={(e) => setF({ ...f, 선금: e.target.checked })}
+          className="h-4 w-4 accent-amber-500"
+        />
+        선금통장에서 선지급 (선금) — 나중에 정산 시 &lsquo;지급&rsquo;으로 변경
+      </label>
       {금액n > 0 && (
         <p className="text-xs text-slate-500">
           원천세 {won(국세 + 지방)} (국세 {won(국세)} + 지방 {won(지방)}) → 실지급{" "}
@@ -578,8 +631,155 @@ function AddPayment({
       >
         {saving ? "저장 중…" : "기록 추가"}
       </button>
-      <style>{`.pinp{box-sizing:border-box;width:100%;border-radius:0.625rem;border:1px solid #e2e8f0;background:#fff;padding:0.5rem 0.75rem;font-size:0.9rem;line-height:1.4;font-family:inherit;-webkit-appearance:none;appearance:none}.pinp:focus{outline:none;box-shadow:0 0 0 2px #6366f1}input[type="date"].pinp::-webkit-date-and-time-value{text-align:left;margin:0}input[type="date"].pinp::-webkit-calendar-picker-indicator{margin:0;padding:0}`}</style>
     </form>
+  );
+}
+
+// 인건비 지급 수정 (project_costs 행) — 모달
+function EditPayment({
+  pay,
+  freelancers,
+  projects,
+  onClose,
+}: {
+  pay: Payment;
+  freelancers: string[];
+  projects: string[];
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const [f, setF] = useState({
+    지급일: pay.지급일,
+    수령인: pay.수령인,
+    금액: String(pay.지급총액),
+    프로젝트: pay.프로젝트 && pay.프로젝트 !== "인건비" ? pay.프로젝트 : "",
+    선금: !!pay.선금여부,
+  });
+  const 금액n = Number(f.금액) || 0;
+  const 국세 = Math.floor((금액n * 0.03) / 10) * 10;
+  const 지방 = Math.floor((금액n * 0.003) / 10) * 10;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!f.수령인 || !f.금액) {
+      setErr("수령인과 금액은 필수입니다.");
+      return;
+    }
+    if (!f.지급일) {
+      setErr("지급일을 입력하세요.");
+      return;
+    }
+    setSaving(true);
+    setErr("");
+    const newName = f.수령인.trim();
+    const res = await fetch("/api/costs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "update",
+        match: {
+          프로젝트: pay.프로젝트,
+          지출일: pay.지급일,
+          내용: pay.내용,
+          금액: pay.지급총액,
+        },
+        cost: {
+          프로젝트: f.프로젝트 || "인건비",
+          구분: "용역비",
+          지출일: f.지급일,
+          내용: newName !== pay.수령인 ? `인건비(${newName})` : pay.내용,
+          금액: 금액n,
+          파트너: newName,
+          지급여부: "지급 완료",
+          선금여부: f.선금 ? "선금" : "",
+        },
+      }),
+    });
+    const json = await res.json().catch(() => ({ ok: res.ok }));
+    setSaving(false);
+    if (res.ok && json.ok) {
+      onClose();
+      router.refresh();
+    } else setErr(json.error || "수정 실패");
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+      onClick={onClose}
+    >
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={submit}
+        className="w-full max-w-md space-y-3 rounded-3xl bg-white p-5 shadow-xl"
+      >
+        <div className="flex items-center justify-between">
+          <span className="text-base font-bold text-slate-800">인건비 수정</span>
+          <button type="button" onClick={onClose}>
+            <X size={20} className="text-slate-400" />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="date"
+            value={f.지급일}
+            onChange={(e) => setF({ ...f, 지급일: e.target.value })}
+            className="pinp"
+          />
+          <Typeahead
+            value={f.수령인}
+            onChange={(v) => setF({ ...f, 수령인: v })}
+            options={freelancers}
+            placeholder="수령인"
+          />
+        </div>
+        <MoneyInput
+          value={금액n}
+          onChange={(n) => setF({ ...f, 금액: n ? String(n) : "" })}
+          placeholder="지급총액(세전)"
+          className="pinp"
+        />
+        <Typeahead
+          value={f.프로젝트}
+          onChange={(v) => setF({ ...f, 프로젝트: v })}
+          options={[...projects].reverse()}
+          placeholder="연결 프로젝트(선택)"
+        />
+        <label className="flex items-center gap-2 text-sm text-slate-600 select-none">
+          <input
+            type="checkbox"
+            checked={f.선금}
+            onChange={(e) => setF({ ...f, 선금: e.target.checked })}
+            className="h-4 w-4 accent-amber-500"
+          />
+          선금 (선금통장 선지급) — 끄면 &lsquo;지급&rsquo;으로 정산
+        </label>
+        {금액n > 0 && (
+          <p className="text-xs text-slate-500">
+            원천세 {won(국세 + 지방)} (국세 {won(국세)} + 지방 {won(지방)}) → 실지급{" "}
+            <b>{won(금액n - 국세 - 지방)}</b>
+          </p>
+        )}
+        {err && <p className="text-sm text-red-500">{err}</p>}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-xl bg-slate-100 py-2.5 font-semibold text-slate-600"
+          >
+            취소
+          </button>
+          <button
+            disabled={saving}
+            className="flex-1 rounded-xl bg-indigo-600 py-2.5 font-semibold text-white disabled:opacity-50"
+          >
+            {saving ? "저장 중…" : "저장"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

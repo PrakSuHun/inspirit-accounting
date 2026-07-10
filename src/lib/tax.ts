@@ -77,8 +77,10 @@ export type WithholdingPayment = {
   원천세합: number;
   실지급액: number;
   프로젝트: string;
-  내용: string; // 삭제 매칭용
-  출처: "project" | "payroll"; // project=앱에서 기록(삭제가능) / payroll=공식 지급명세서(시트수정)
+  내용: string; // 삭제/수정 매칭용
+  선금여부: string; // "선금" 이면 선금통장에서 선지급 (아직 정산 전)
+  지급여부: string;
+  출처: "project" | "payroll"; // project=앱에서 기록(수정/삭제가능) / payroll=공식 지급명세서(시트수정)
 };
 
 // 인건비 탭 = ① 프로젝트에 기록한 용역비(project_costs) + ② 공식 지급명세서(payroll).
@@ -104,6 +106,8 @@ export function withholdingPayments(ledger: Ledger): WithholdingPayment[] {
         실지급액: c.금액 - 국세 - 지방,
         프로젝트: c.프로젝트,
         내용: c.내용,
+        선금여부: c.선금여부 ?? "",
+        지급여부: c.지급여부 ?? "",
         출처: "project" as const,
       };
     });
@@ -132,6 +136,8 @@ export function withholdingPayments(ledger: Ledger): WithholdingPayment[] {
         실지급액: p.지급액 - 국세 - 지방,
         프로젝트: p.업종 ? `지급명세서 · ${p.업종}` : "지급명세서",
         내용: p.업종 ?? "",
+        선금여부: "",
+        지급여부: "지급 완료",
         출처: "payroll" as const,
       };
     });

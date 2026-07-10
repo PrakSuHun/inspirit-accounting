@@ -30,3 +30,30 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* 입력 필드 공통 (인건비 폼 등). iOS 날짜칸이 혼자 커지는 것 방지 */
+.pinp {
+  box-sizing: border-box;
+  width: 100%;
+  border-radius: 0.625rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  font-family: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.pinp:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #6366f1;
+}
+input[type="date"].pinp::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}
+input[type="date"].pinp::-webkit-calendar-picker-indicator {
+  margin: 0;
+  padding: 0;
+}
