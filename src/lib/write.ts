@@ -78,6 +78,30 @@ export async function appendRows(
   return newRows.length;
 }
 
+/** 원천세 신고 상태 설정(귀속월 단위). 기존 행 정리 후 filed 면 한 행만 기록. */
+export async function setFiling(
+  귀속월: string,
+  filed: boolean,
+  신고일: string
+): Promise<void> {
+  if (useSheets()) {
+    const { sheetsSetFiling } = await import("./sheets");
+    await sheetsSetFiling(귀속월, filed, 신고일);
+    return;
+  }
+  // 로컬 xlsx: 같은 귀속월 행 제거 후 filed 면 추가
+  try {
+    while (await deleteRowByMatch("wh_filings", { 귀속월 })) {
+      /* 중복 전부 제거 */
+    }
+  } catch {
+    /* 시트 없음 무시 */
+  }
+  if (filed) {
+    await appendRows("wh_filings", [{ 귀속월, 신고여부: "완료", 신고일 }]);
+  }
+}
+
 /** match 의 모든 컬럼이 일치하는 첫 행을 삭제 */
 export async function deleteRowByMatch(
   sheetName: string,

@@ -153,6 +153,51 @@ export async function sheetsUpdateRow(
   return true;
 }
 
+// 값(serial 숫자·"2026-06"·"2026. 6." 등)을 YYYY-MM 으로 정규화
+function ymOf(v: unknown): string {
+  if (v == null || v === "") return "";
+  const toYm = (n: number) => {
+    const d = new Date(Math.round((n - 25569) * 86400000));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  };
+  if (typeof v === "number" && v > 20000 && v < 100000) return toYm(v);
+  const s = String(v).trim();
+  if (/^\d{4,6}(\.\d+)?$/.test(s)) {
+    const n = Number(s);
+    if (n > 20000 && n < 100000) return toYm(n);
+  }
+  const m = s.match(/(\d{4})[.\-/년\s]+(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}`;
+  return s.slice(0, 7);
+}
+
+// 원천세 신고 상태 설정: 해당 귀속월의 기존 행(직렬화·중복 포함) 전부 정리 후
+// filed 면 깨끗한 행 하나만 텍스트로 기록. 토글 on/off 를 확실히 반영.
+export async function sheetsSetFiling(
+  귀속월: string,
+  filed: boolean,
+  신고일: string
+): Promise<void> {
+  const doc = await getDoc();
+  let sheet = doc.sheetsByTitle["wh_filings"];
+  if (!sheet) {
+    if (!filed) return;
+    sheet = await doc.addSheet({
+      title: "wh_filings",
+      headerValues: ["귀속월", "신고여부", "신고일"],
+    });
+    await sheet.addRows([{ 귀속월, 신고여부: "완료", 신고일 }], { raw: true });
+    return;
+  }
+  const rows = await sheet.getRows();
+  const dead = rows.filter((r) => ymOf(r.get("귀속월")) === 귀속월);
+  // 뒤에서부터 삭제해야 인덱스가 안 밀림
+  for (let i = dead.length - 1; i >= 0; i--) await dead[i].delete();
+  if (filed) {
+    await sheet.addRows([{ 귀속월, 신고여부: "완료", 신고일 }], { raw: true });
+  }
+}
+
 // match 의 모든 컬럼이 일치하는 첫 행 삭제
 export async function sheetsDeleteRowByMatch(
   name: string,

@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { won, manwon } from "@/lib/format";
 import { Card, SectionTitle } from "@/components/ui";
-import { Plus, X, Upload, Download, Trash2, ChevronDown } from "lucide-react";
+import { Plus, X, Download, Trash2, ChevronDown } from "lucide-react";
 import MoneyInput from "./MoneyInput";
 
 type FilingRow = {
@@ -340,7 +340,6 @@ export default function Payroll({
       {/* 입력 */}
       <div className="px-5 mt-4 space-y-3">
         <AddPayment freelancers={freelancers} projects={projects} />
-        <BulkUpload />
       </div>
 
       {/* 연말 지급명세서 다운로드 */}
@@ -566,59 +565,3 @@ function AddPayment({
   );
 }
 
-function BulkUpload() {
-  const router = useRouter();
-  const [result, setResult] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setLoading(true);
-    setResult("");
-    const buf = await file.arrayBuffer();
-    const b64 = btoa(
-      new Uint8Array(buf).reduce((s, b) => s + String.fromCharCode(b), "")
-    );
-    const res = await fetch("/api/payroll/upload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename: file.name, data: b64 }),
-    });
-    const json = await res.json();
-    setLoading(false);
-    if (json.ok) {
-      setResult(`✅ ${json.added}건 등록 (신규 ${json.newPartners}명).`);
-      router.refresh();
-    } else setResult(`⚠️ ${json.error || "업로드 실패"}`);
-  }
-
-  return (
-    <details className="rounded-2xl border border-slate-100 bg-white p-4">
-      <summary className="flex items-center gap-2 text-sm font-semibold text-slate-600 cursor-pointer list-none">
-        <Upload size={15} /> 엑셀로 한꺼번에 등록 / 템플릿
-      </summary>
-      <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-        컬럼: <b>지급일, 수령인, 주민번호, 지급액, 프로젝트(선택)</b>. 업로드하면
-        전부 기록되고 원천세가 자동 계산됩니다.
-      </p>
-      <a
-        href="/api/payroll/template"
-        className="inline-block text-xs text-indigo-600 font-medium underline mt-2"
-      >
-        템플릿 다운로드
-      </a>
-      <label className="mt-2 block">
-        <input
-          type="file"
-          accept=".xlsx,.csv"
-          onChange={onFile}
-          disabled={loading}
-          className="block w-full text-sm text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-slate-200 file:text-slate-700 file:font-semibold"
-        />
-      </label>
-      {loading && <p className="text-xs text-indigo-500 mt-2">처리 중…</p>}
-      {result && <p className="text-sm text-slate-600 mt-2">{result}</p>}
-    </details>
-  );
-}
