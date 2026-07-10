@@ -219,11 +219,15 @@ export async function loadFilings(): Promise<
   const raw = await getRawRows();
   const out: Record<string, { 신고여부: string; 신고일: string }> = {};
   for (const r of raw["wh_filings"] ?? []) {
-    const ym = String(r["귀속월"] ?? "");
+    // 구글시트가 "2026-06" 을 날짜(serial)로 저장할 수 있어 YYYY-MM 로 정규화
+    // (안 하면 귀속월 키가 "46174" 같은 숫자로 읽혀 신고 상태가 매칭 안 됨)
+    const ym =
+      toDateStr(r["귀속월"]).slice(0, 7) ||
+      String(r["귀속월"] ?? "").trim().slice(0, 7);
     if (!ym) continue;
     out[ym] = {
       신고여부: String(r["신고여부"] ?? ""),
-      신고일: String(r["신고일"] ?? ""),
+      신고일: toDateStr(r["신고일"]) || String(r["신고일"] ?? ""),
     };
   }
   return out;

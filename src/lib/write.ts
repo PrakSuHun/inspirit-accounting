@@ -22,11 +22,12 @@ export async function updateRow(
   sheetName: string,
   keyCol: string,
   keyVal: string,
-  patch: Record<string, string | number>
+  patch: Record<string, string | number>,
+  raw = false
 ): Promise<boolean> {
   if (useSheets()) {
     const { sheetsUpdateRow } = await import("./sheets");
-    const ok = await sheetsUpdateRow(sheetName, keyCol, keyVal, patch);
+    const ok = await sheetsUpdateRow(sheetName, keyCol, keyVal, patch, raw);
     return ok;
   }
   const wb = readWb();
@@ -53,12 +54,13 @@ export async function updateRow(
 /** 시트에 새 행 추가 (없으면 시트 생성) */
 export async function appendRows(
   sheetName: string,
-  newRows: Record<string, string | number>[]
+  newRows: Record<string, string | number>[],
+  raw = false
 ): Promise<number> {
   if (newRows.length === 0) return 0;
   if (useSheets()) {
     const { sheetsAppendRows } = await import("./sheets");
-    const n = await sheetsAppendRows(sheetName, newRows);
+    const n = await sheetsAppendRows(sheetName, newRows, raw);
     return n;
   }
   const wb = readWb();

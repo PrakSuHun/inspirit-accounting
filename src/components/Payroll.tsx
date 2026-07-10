@@ -104,13 +104,23 @@ export default function Payroll({
 
   async function toggleFiled(귀속월: string, filed: boolean) {
     setSavingYm(귀속월);
-    await fetch("/api/payroll/file", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 귀속월, filed }),
-    });
-    setSavingYm(null);
-    router.refresh();
+    try {
+      const res = await fetch("/api/payroll/file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 귀속월, filed }),
+      });
+      const json = await res.json().catch(() => ({ ok: res.ok }));
+      if (!res.ok || !json.ok) {
+        alert(`신고 상태 저장 실패: ${json.error || res.status}`);
+        return;
+      }
+      router.refresh();
+    } catch (e) {
+      alert(`신고 상태 저장 실패: ${(e as Error).message}`);
+    } finally {
+      setSavingYm(null);
+    }
   }
 
   async function del(p: Payment) {
@@ -373,6 +383,61 @@ export default function Payroll({
   );
 }
 
+// 모바일에서 datalist 가 안 뜨는 문제 → 직접 만든 자동완성 드롭다운
+function Typeahead({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder: string;
+}) {
+  const [focus, setFocus] = useState(false);
+  const q = value.trim().toLowerCase();
+  const matches = useMemo(() => {
+    if (!focus) return [];
+    const base = q
+      ? options.filter((o) => o.toLowerCase().includes(q) && o !== value)
+      : options;
+    return base.slice(0, 8);
+  }, [focus, q, options, value]);
+  return (
+    <div className="relative">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocus(true)}
+        onBlur={() => setTimeout(() => setFocus(false), 150)}
+        placeholder={placeholder}
+        autoComplete="off"
+        className="pinp w-full"
+      />
+      {matches.length > 0 && (
+        <ul className="absolute z-30 left-0 right-0 mt-1 max-h-52 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+          {matches.map((o) => (
+            <li key={o}>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(o);
+                  setFocus(false);
+                }}
+                className="w-full px-3 py-2.5 text-left text-sm text-slate-700 active:bg-indigo-50 hover:bg-indigo-50"
+              >
+                {o}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function AddPayment({
   freelancers,
   projects,
@@ -438,16 +503,6 @@ function AddPayment({
       onSubmit={submit}
       className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3"
     >
-      <datalist id="fl-list">
-        {freelancers.map((p) => (
-          <option key={p} value={p} />
-        ))}
-      </datalist>
-      <datalist id="pj-list">
-        {projects.map((p) => (
-          <option key={p} value={p} />
-        ))}
-      </datalist>
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-slate-700">
           누구에게 얼마 지급했나요?
@@ -463,12 +518,11 @@ function AddPayment({
           onChange={(e) => setF({ ...f, 지급일: e.target.value })}
           className="pinp"
         />
-        <input
-          list="fl-list"
+        <Typeahead
           value={f.수령인}
-          onChange={(e) => setF({ ...f, 수령인: e.target.value })}
+          onChange={(v) => setF({ ...f, 수령인: v })}
+          options={freelancers}
           placeholder="수령인(프리랜서)"
-          className="pinp"
         />
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -485,12 +539,11 @@ function AddPayment({
           className="pinp"
         />
       </div>
-      <input
-        list="pj-list"
+      <Typeahead
         value={f.프로젝트}
-        onChange={(e) => setF({ ...f, 프로젝트: e.target.value })}
+        onChange={(v) => setF({ ...f, 프로젝트: v })}
+        options={projects}
         placeholder="연결 프로젝트(선택)"
-        className="pinp"
       />
       {금액n > 0 && (
         <p className="text-xs text-slate-500">

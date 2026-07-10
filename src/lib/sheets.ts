@@ -114,7 +114,8 @@ export async function sheetsRawRows(): Promise<
 // 행 추가 (시트 없으면 생성)
 export async function sheetsAppendRows(
   name: string,
-  newRows: Record<string, string | number>[]
+  newRows: Record<string, string | number>[],
+  raw = false
 ): Promise<number> {
   if (newRows.length === 0) return 0;
   const doc = await getDoc();
@@ -125,7 +126,8 @@ export async function sheetsAppendRows(
       headerValues: Object.keys(newRows[0]),
     });
   }
-  await sheet.addRows(newRows);
+  // raw=true → 구글시트가 "2026-06" 같은 값을 날짜로 자동해석하지 않게 텍스트로 저장
+  await sheet.addRows(newRows, raw ? { raw: true } : undefined);
   return newRows.length;
 }
 
@@ -134,19 +136,20 @@ export async function sheetsUpdateRow(
   name: string,
   keyCol: string,
   keyVal: string,
-  patch: Record<string, string | number>
+  patch: Record<string, string | number>,
+  raw = false
 ): Promise<boolean> {
   const doc = await getDoc();
   const sheet = doc.sheetsByTitle[name];
   if (!sheet) {
-    await sheetsAppendRows(name, [{ [keyCol]: keyVal, ...patch }]);
+    await sheetsAppendRows(name, [{ [keyCol]: keyVal, ...patch }], raw);
     return true;
   }
   const rows = await sheet.getRows();
   const row = rows.find((r) => String(r.get(keyCol)) === keyVal);
   if (!row) return false;
   for (const [k, v] of Object.entries(patch)) row.set(k, v as string | number);
-  await row.save();
+  await row.save(raw ? { raw: true } : undefined);
   return true;
 }
 
