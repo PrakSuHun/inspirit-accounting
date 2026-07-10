@@ -56,7 +56,6 @@ export default function Payroll({
   const [openPerson, setOpenPerson] = useState<string | null>(null);
   const [showYear, setShowYear] = useState<"2025" | "2026">("2026");
 
-  const next = schedule.find((s) => s.status === "이번신고");
   const overdue = schedule.filter((s) => s.status === "지연");
   const scheduleMap = new Map(schedule.map((s) => [s.귀속연월, s]));
 
@@ -175,16 +174,30 @@ export default function Payroll({
               <button
                 onClick={() => toggleFiled(month, !monthFiling.filed)}
                 disabled={savingYm === month}
-                className={`text-[11px] px-2.5 py-1 rounded-full font-medium ${
+                className={`text-xs px-3 py-1.5 rounded-full font-semibold transition active:scale-95 disabled:opacity-60 ${
                   monthFiling.filed
-                    ? "bg-white/25"
-                    : "bg-white/15"
+                    ? "bg-emerald-400 text-white"
+                    : "bg-white text-indigo-700"
                 }`}
               >
-                {monthFiling.filed ? "✓ 신고완료" : "신고 표시"}
+                {savingYm === month
+                  ? "저장중…"
+                  : monthFiling.filed
+                  ? "✓ 신고완료"
+                  : "신고완료"}
               </button>
             )}
           </div>
+          {monthFiling && (
+            <div className="text-[11px] mt-1 opacity-85">
+              {month} 귀속 · {monthFiling.신고기한}까지 신고
+              {!monthFiling.filed && monthFiling.status === "지연" && (
+                <span className="ml-1 font-semibold text-amber-200">
+                  · 기한 지남
+                </span>
+              )}
+            </div>
+          )}
           <div className="text-3xl font-bold mt-1.5">{won(sum.지급총액)}</div>
           <div className="flex gap-4 mt-3 text-sm">
             <div>
@@ -301,35 +314,25 @@ export default function Payroll({
         </div>
       </div>
 
-      {/* 다음 신고 알림 */}
-      {next && (
-        <div className="px-5 mt-4">
-          <div className="rounded-2xl bg-rose-50 border border-rose-200 p-3.5 flex items-center justify-between">
-            <div>
-              <div className="text-xs text-rose-500 font-medium">
-                다음 신고 · {next.신고기한}까지
-              </div>
-              <div className="text-lg font-bold text-rose-700">
-                {won(next.징수세액합)}
-                <span className="text-xs font-normal text-rose-400 ml-1">
-                  {next.귀속연월} 귀속
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={() => toggleFiled(next.귀속연월, true)}
-              disabled={savingYm === next.귀속연월}
-              className="text-xs bg-rose-600 text-white px-3 py-2 rounded-xl font-semibold active:scale-95 disabled:opacity-50"
-            >
-              신고완료
-            </button>
-          </div>
-        </div>
-      )}
+      {/* 기한 지난 미신고 — 칩을 탭하면 해당 월로 이동해서 신고완료 처리 */}
       {overdue.length > 0 && (
-        <div className="px-5 mt-2">
+        <div className="px-5 mt-3">
           <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-700">
-            ⚠️ 기한 지난 미신고: {overdue.map((o) => o.귀속연월).join(", ")}
+            <span className="font-medium">⚠️ 기한 지난 미신고 (탭하면 이동)</span>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {overdue.map((o) => (
+                <button
+                  key={o.귀속연월}
+                  onClick={() => {
+                    setMonth(o.귀속연월);
+                    setOpenPerson(null);
+                  }}
+                  className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 font-medium active:scale-95"
+                >
+                  {o.귀속연월}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
