@@ -7,13 +7,15 @@ import { Plus, X, Trash2, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import MoneyInput from "./MoneyInput";
 import type { AndoneEntry } from "@/lib/types";
 
+type ProjOpt = { name: string; client: string; amount: number; date: string };
+
 export default function Andone({
   entries,
   projects,
   vendors,
 }: {
   entries: AndoneEntry[];
-  projects: string[];
+  projects: ProjOpt[];
   vendors: string[];
 }) {
   const router = useRouter();
@@ -34,16 +36,31 @@ export default function Andone({
     [entries]
   );
 
+  // 이미 청구로 연결된 프로젝트 (중복 연결 방지)
+  const claimedNames = useMemo(
+    () => new Set(청구목록.map((e) => e.프로젝트).filter(Boolean)),
+    [청구목록]
+  );
+
   const 받을총액 = 청구목록.reduce((s, e) => s + e.금액, 0);
   const 받은총액 = 수령목록.reduce((s, e) => s + e.금액, 0);
   const 미수 = 받을총액 - 받은총액;
 
+  const keyOf = (e: AndoneEntry) =>
+    e.구분 + e.날짜 + e.내용 + e.금액 + e.경로업체;
+
+  // 삭제는 andone 시트에서만 — 프로젝트에는 영향 없음
   async function del(e: AndoneEntry) {
     const label = e.구분 === "수령" ? "받은 돈" : "받아야 할 돈";
-    if (!confirm(`${label} "${e.내용 || e.경로업체 || e.날짜} ${won(e.금액)}" 삭제할까요?`))
+    if (
+      !confirm(
+        `${label} "${e.내용 || e.경로업체 || e.날짜} ${won(
+          e.금액
+        )}" 을(를) 앤드원 정산에서 삭제할까요?\n(프로젝트 기록은 그대로 유지됩니다)`
+      )
+    )
       return;
-    const key = e.구분 + e.날짜 + e.내용 + e.금액 + e.경로업체;
-    setDelKey(key);
+    setDelKey(keyOf(e));
     await fetch("/api/andone", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -88,42 +105,48 @@ export default function Andone({
             </div>
           </div>
           <div className="text-[11px] mt-3 opacity-85 leading-relaxed">
-            앤드원에서 받아야 할 금액 중, 다른 업체를 통해 받은 돈을 뺀 차액을 앤드원에
-            청구하세요.
+            세금계산서 발급한 프로젝트를 연결해 받을 돈을 잡고, 다른 업체를 통해 받은
+            돈을 빼면 앤드원에 청구할 차액이 나옵니다.
           </div>
         </div>
       </div>
 
       {/* 입력 */}
       <div className="px-5 mt-4">
-        <AddEntry projects={projects} vendors={vendors} />
+        <AddEntry
+          projects={projects}
+          vendors={vendors}
+          claimedNames={claimedNames}
+        />
       </div>
 
       {/* 받아야 할 돈 (청구) */}
-      <SectionTitle>받아야 할 돈 (앤드원 청구)</SectionTitle>
+      <SectionTitle>받아야 할 돈 (세금계산서 발급 건)</SectionTitle>
       <div className="px-5 space-y-2">
-        {청구목록.map((e, i) => (
+        {청구목록.map((e) => (
           <Row
-            key={i}
+            key={keyOf(e)}
             e={e}
             tone="claim"
             onDelete={() => del(e)}
-            deleting={delKey === e.구분 + e.날짜 + e.내용 + e.금액 + e.경로업체}
+            deleting={delKey === keyOf(e)}
           />
         ))}
-        {청구목록.length === 0 && <Empty text="받아야 할 돈이 아직 없습니다." />}
+        {청구목록.length === 0 && (
+          <Empty text="연결한 프로젝트가 아직 없습니다." />
+        )}
       </div>
 
       {/* 받은 돈 (수령) */}
       <SectionTitle>받은 돈 (다른 업체 통해)</SectionTitle>
       <div className="px-5 space-y-2 pb-4">
-        {수령목록.map((e, i) => (
+        {수령목록.map((e) => (
           <Row
-            key={i}
+            key={keyOf(e)}
             e={e}
             tone="receive"
             onDelete={() => del(e)}
-            deleting={delKey === e.구분 + e.날짜 + e.내용 + e.금액 + e.경로업체}
+            deleting={delKey === keyOf(e)}
           />
         ))}
         {수령목록.length === 0 && <Empty text="받은 돈이 아직 없습니다." />}
@@ -152,6 +175,7 @@ function Row({
   deleting: boolean;
 }) {
   const claim = tone === "claim";
+  const title = e.내용 || e.프로젝트 || (claim ? "앤드원 청구" : "수령");
   return (
     <Card className="p-3.5">
       <div className="flex items-center justify-between gap-2">
@@ -165,12 +189,12 @@ function Row({
           </span>
           <div className="min-w-0">
             <div className="text-sm font-medium text-slate-800 truncate">
-              {e.내용 || (claim ? "앤드원 청구" : "수령")}
+              {title}
             </div>
             <div className="text-[11px] text-slate-400 truncate">
               {e.날짜 || "날짜 없음"}
               {!claim && e.경로업체 && ` · ${e.경로업체} 통해`}
-              {e.프로젝트 && ` · ${e.프로젝트}`}
+              {e.프로젝트 && e.프로젝트 !== title && ` · ${e.프로젝트}`}
             </div>
           </div>
         </div>
@@ -187,7 +211,7 @@ function Row({
             onClick={onDelete}
             disabled={deleting}
             className="text-slate-300 hover:text-rose-500 disabled:opacity-40 p-1"
-            title="삭제"
+            title="앤드원 정산에서만 삭제"
           >
             <Trash2 size={15} />
           </button>
@@ -200,17 +224,23 @@ function Row({
 function AddEntry({
   projects,
   vendors,
+  claimedNames,
 }: {
-  projects: string[];
+  projects: ProjOpt[];
   vendors: string[];
+  claimedNames: Set<string>;
 }) {
   const router = useRouter();
   const today = new Date().toISOString().slice(0, 10);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
-  const [f, setF] = useState({
-    구분: "청구" as "청구" | "수령",
+  const [mode, setMode] = useState<"청구" | "수령">("청구");
+
+  // 청구: 프로젝트 연결 (금액·날짜 자동)
+  const [claim, setClaim] = useState<ProjOpt | null>(null);
+  // 수령: 직접 입력
+  const [r, setR] = useState({
     날짜: today,
     금액: "",
     내용: "",
@@ -218,37 +248,64 @@ function AddEntry({
     프로젝트: "",
   });
 
-  function reset() {
-    setF({
-      구분: f.구분,
-      날짜: today,
-      금액: "",
-      내용: "",
-      경로업체: "",
-      프로젝트: "",
-    });
+  const availProjects = useMemo(
+    () => projects.filter((p) => !claimedNames.has(p.name)),
+    [projects, claimedNames]
+  );
+  const projectNames = useMemo(() => projects.map((p) => p.name), [projects]);
+
+  function resetAndClose() {
+    setClaim(null);
+    setR({ 날짜: today, 금액: "", 내용: "", 경로업체: "", 프로젝트: "" });
+    setErr("");
+    setOpen(false);
   }
 
-  async function submit(ev: React.FormEvent) {
-    ev.preventDefault();
-    if (!f.금액 || !Number(f.금액)) {
-      setErr("금액을 입력하세요.");
-      return;
-    }
+  async function post(entry: Record<string, string | number>) {
     setSaving(true);
     setErr("");
     const res = await fetch("/api/andone", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "create", entry: f }),
+      body: JSON.stringify({ action: "create", entry }),
     });
     const json = await res.json().catch(() => ({ ok: res.ok }));
     setSaving(false);
     if (json.ok) {
-      reset();
-      setOpen(false);
+      resetAndClose();
       router.refresh();
     } else setErr(json.error || "저장 실패");
+  }
+
+  function submit(ev: React.FormEvent) {
+    ev.preventDefault();
+    if (mode === "청구") {
+      if (!claim) {
+        setErr("연결할 프로젝트를 선택하세요.");
+        return;
+      }
+      post({
+        날짜: claim.date,
+        구분: "청구",
+        내용: claim.name,
+        금액: claim.amount,
+        경로업체: "",
+        프로젝트: claim.name,
+      });
+    } else {
+      if (!r.금액 || !Number(r.금액)) {
+        setErr("금액을 입력하세요.");
+        return;
+      }
+      post({
+        날짜: r.날짜,
+        구분: "수령",
+        내용: r.내용,
+        금액: Number(r.금액),
+        경로업체: r.경로업체,
+        프로젝트: r.프로젝트,
+      });
+    }
   }
 
   if (!open)
@@ -261,7 +318,6 @@ function AddEntry({
       </button>
     );
 
-  const 수령 = f.구분 === "수령";
   return (
     <form
       onSubmit={submit}
@@ -269,7 +325,7 @@ function AddEntry({
     >
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-slate-700">정산 내역 추가</span>
-        <button type="button" onClick={() => setOpen(false)}>
+        <button type="button" onClick={resetAndClose}>
           <X size={18} className="text-slate-400" />
         </button>
       </div>
@@ -280,9 +336,12 @@ function AddEntry({
           <button
             key={g}
             type="button"
-            onClick={() => setF({ ...f, 구분: g })}
+            onClick={() => {
+              setMode(g);
+              setErr("");
+            }}
             className={`rounded-xl py-2.5 text-sm font-semibold transition ${
-              f.구분 === g
+              mode === g
                 ? g === "청구"
                   ? "bg-rose-500 text-white"
                   : "bg-emerald-500 text-white"
@@ -294,52 +353,158 @@ function AddEntry({
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <input
-          type="date"
-          value={f.날짜}
-          onChange={(e) => setF({ ...f, 날짜: e.target.value })}
-          className="pinp"
-        />
-        <MoneyInput
-          value={Number(f.금액) || 0}
-          onChange={(n) => setF({ ...f, 금액: n ? String(n) : "" })}
-          placeholder="금액"
-          className="pinp"
-        />
-      </div>
-
-      <input
-        value={f.내용}
-        onChange={(e) => setF({ ...f, 내용: e.target.value })}
-        placeholder={수령 ? "내용 (무슨 건인지)" : "내용 (무슨 건인지)"}
-        className="pinp w-full"
-      />
-
-      {수령 && (
-        <Typeahead
-          value={f.경로업체}
-          onChange={(v) => setF({ ...f, 경로업체: v })}
-          options={vendors}
-          placeholder="어느 업체 통해 받았나요?"
-        />
+      {mode === "청구" ? (
+        <>
+          <ProjectPicker
+            options={availProjects}
+            value={claim}
+            onSelect={setClaim}
+          />
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            세금계산서 발급한 프로젝트를 고르면 금액·납품일이 자동으로 들어갑니다.
+            직접 입력할 필요 없어요.
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="date"
+              value={r.날짜}
+              onChange={(e) => setR({ ...r, 날짜: e.target.value })}
+              className="pinp"
+            />
+            <MoneyInput
+              value={Number(r.금액) || 0}
+              onChange={(n) => setR({ ...r, 금액: n ? String(n) : "" })}
+              placeholder="받은 금액"
+              className="pinp"
+            />
+          </div>
+          <input
+            value={r.내용}
+            onChange={(e) => setR({ ...r, 내용: e.target.value })}
+            placeholder="내용 (무슨 건인지)"
+            className="pinp w-full"
+          />
+          <Typeahead
+            value={r.경로업체}
+            onChange={(v) => setR({ ...r, 경로업체: v })}
+            options={vendors}
+            placeholder="어느 업체 통해 받았나요?"
+          />
+          <Typeahead
+            value={r.프로젝트}
+            onChange={(v) => setR({ ...r, 프로젝트: v })}
+            options={[...projectNames].reverse()}
+            placeholder="연결 프로젝트(선택)"
+          />
+        </>
       )}
-
-      <Typeahead
-        value={f.프로젝트}
-        onChange={(v) => setF({ ...f, 프로젝트: v })}
-        options={[...projects].reverse()}
-        placeholder="연결 프로젝트(선택)"
-      />
 
       {err && <p className="text-sm text-red-500">{err}</p>}
       <button
         disabled={saving}
         className="w-full rounded-xl bg-indigo-600 text-white py-2.5 font-semibold disabled:opacity-50"
       >
-        {saving ? "저장 중…" : "기록 추가"}
+        {saving ? "저장 중…" : "추가"}
       </button>
     </form>
+  );
+}
+
+// 프로젝트 연결 선택기 (세금계산서 발급 건 → 금액·날짜 자동)
+function ProjectPicker({
+  options,
+  value,
+  onSelect,
+}: {
+  options: ProjOpt[];
+  value: ProjOpt | null;
+  onSelect: (p: ProjOpt | null) => void;
+}) {
+  const [focus, setFocus] = useState(false);
+  const [q, setQ] = useState("");
+  const matches = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    const base = s
+      ? options.filter((o) =>
+          `${o.name} ${o.client}`.toLowerCase().includes(s)
+        )
+      : options;
+    return base.slice(0, 12);
+  }, [q, options]);
+
+  if (value)
+    return (
+      <div className="flex items-center justify-between rounded-xl border border-rose-200 bg-white px-3 py-2.5">
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-slate-800 truncate">
+            {value.name}
+          </div>
+          <div className="text-[11px] text-slate-400 truncate">
+            {value.client && `${value.client} · `}받을 돈 {won(value.amount)}
+            {value.date && ` · ${value.date}`}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => onSelect(null)}
+          className="text-slate-400 shrink-0 pl-2"
+        >
+          <X size={16} />
+        </button>
+      </div>
+    );
+
+  return (
+    <div className="relative">
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onFocus={() => setFocus(true)}
+        onBlur={() => setTimeout(() => setFocus(false), 150)}
+        placeholder="세금계산서 발급한 프로젝트 선택"
+        autoComplete="off"
+        className="pinp w-full"
+      />
+      {focus && matches.length > 0 && (
+        <ul className="absolute z-30 left-0 right-0 mt-1 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+          {matches.map((o) => (
+            <li key={o.name}>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onSelect(o);
+                  setFocus(false);
+                  setQ("");
+                }}
+                className="w-full px-3 py-2.5 text-left active:bg-indigo-50 hover:bg-indigo-50"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-slate-700 truncate">
+                    {o.name}
+                  </span>
+                  <span className="text-xs font-semibold text-slate-500 shrink-0">
+                    {won(o.amount)}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 truncate">
+                  {o.client}
+                  {o.date && ` · ${o.date}`}
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {focus && matches.length === 0 && (
+        <div className="absolute z-30 left-0 right-0 mt-1 rounded-xl border border-slate-200 bg-white shadow-lg px-3 py-2.5 text-sm text-slate-400">
+          연결할 프로젝트가 없습니다 (이미 다 연결했거나 프로젝트 없음)
+        </div>
+      )}
+    </div>
   );
 }
 
