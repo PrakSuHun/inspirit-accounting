@@ -19,6 +19,7 @@ export const SHEET_TABS = [
   "tax_settings",
   "payroll",
   "wh_filings",
+  "andone",
 ];
 
 function getAuth(): JWT {

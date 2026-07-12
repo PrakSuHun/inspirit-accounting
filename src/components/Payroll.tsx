@@ -242,30 +242,30 @@ export default function Payroll({
               <Card key={p.수령인} className="overflow-hidden">
                 <button
                   onClick={() => setOpenPerson(open ? null : p.수령인)}
-                  className="w-full flex items-center justify-between p-4"
+                  className="w-full p-4 text-left"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-800">
-                      {p.수령인}
-                    </span>
-                    <span className="text-[11px] text-slate-400">
-                      {p.pays.length}건
-                    </span>
-                    <ChevronDown
-                      size={15}
-                      className={`text-slate-300 transition-transform ${
-                        open ? "rotate-180" : ""
-                      }`}
-                    />
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-slate-900">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-semibold text-slate-800 truncate">
+                        {p.수령인}
+                      </span>
+                      <span className="text-[11px] text-slate-400 shrink-0">
+                        {p.pays.length}건
+                      </span>
+                      <ChevronDown
+                        size={15}
+                        className={`text-slate-300 shrink-0 transition-transform ${
+                          open ? "rotate-180" : ""
+                        }`}
+                      />
+                    </div>
+                    <div className="text-base font-bold text-slate-900 shrink-0">
                       {won(p.지급총액)}
                     </div>
-                    <div className="text-[11px] text-slate-400">
-                      실지급 {won(p.실지급액)} · 원천세 {won(p.국세)} · 지방세{" "}
-                      {won(p.지방소득세)}
-                    </div>
+                  </div>
+                  <div className="mt-1 text-[11px] text-slate-400 whitespace-nowrap overflow-hidden text-ellipsis">
+                    실지급 {won(p.실지급액)} · 원천세 {won(p.국세)} · 지방세{" "}
+                    {won(p.지방소득세)}
                   </div>
                 </button>
 

@@ -107,6 +107,16 @@ export type TaxSetting = {
   설명: string;
 };
 
+// 앤드원 정산 장부 (andone 탭) — 받아야 할 돈(청구) / 받은 돈(수령)
+export type AndoneEntry = {
+  날짜: string;
+  구분: string; // 청구(받아야 할) | 수령(받은)
+  내용: string;
+  금액: number;
+  경로업체: string; // 어느 업체를 통해 받았는지 (수령 시)
+  프로젝트: string; // 연결 프로젝트(선택)
+};
+
 // 공식 간이지급명세서(사업소득) 기반 인건비/원천세 레코드 = 신고 진실값
 export type PayrollEntry = {
   귀속연월: string; // YYYY-MM

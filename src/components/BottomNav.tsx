@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutGrid,
   FolderKanban,
+  Handshake,
   Users,
   Wallet,
   Receipt,
@@ -12,6 +13,7 @@ import {
 const items = [
   { href: "/", label: "대시보드", icon: LayoutGrid },
   { href: "/projects", label: "프로젝트", icon: FolderKanban },
+  { href: "/andone", label: "앤드원", icon: Handshake },
   { href: "/payroll", label: "인건비", icon: Users },
   { href: "/expenses", label: "공통경비", icon: Wallet },
   { href: "/tax", label: "세금", icon: Receipt },
@@ -24,7 +26,7 @@ export default function BottomNav() {
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40">
       <div className="mx-auto max-w-md bg-white/90 backdrop-blur border-t border-slate-100 px-2 pt-2 pb-[max(8px,env(safe-area-inset-bottom))]">
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {items.map((it) => {
             const active =
               it.href === "/" ? path === "/" : path.startsWith(it.href);
