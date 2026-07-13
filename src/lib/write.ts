@@ -78,6 +78,95 @@ export async function appendRows(
   return newRows.length;
 }
 
+/** match 의 모든 컬럼이 일치하는 '모든' 행을 patch 로 갱신. 갱신된 행 수 반환. */
+export async function updateRowsByMatch(
+  sheetName: string,
+  match: Record<string, string | number>,
+  patch: Record<string, string | number>,
+  raw = false
+): Promise<number> {
+  if (useSheets()) {
+    const { sheetsUpdateRowsByMatch } = await import("./sheets");
+    return sheetsUpdateRowsByMatch(sheetName, match, patch, raw);
+  }
+  const wb = readWb();
+  const ws = wb.Sheets[sheetName];
+  if (!ws) return 0;
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+    defval: "",
+    raw: true,
+  });
+  let n = 0;
+  for (const r of rows) {
+    if (Object.entries(match).every(([k, v]) => String(r[k]) === String(v))) {
+      Object.assign(r, patch);
+      n++;
+    }
+  }
+  if (n > 0) {
+    wb.Sheets[sheetName] = XLSX.utils.json_to_sheet(rows);
+    writeWb(wb);
+  }
+  return n;
+}
+
+/**
+ * 프로젝트명 변경 + 연결 전파(cascade).
+ * projects 행 이름과, 그 이름을 참조하는 project_costs·andone·tax_invoices 를 한 번에 변경.
+ * → 인건비·앤드원·세금계산서 연결이 끊기지 않음.
+ */
+export async function renameProject(
+  oldName: string,
+  newName: string
+): Promise<{
+  project: boolean;
+  costs: number;
+  andone: number;
+  invoices: number;
+}> {
+  const old = oldName.trim();
+  const nw = newName.trim();
+  if (!old || !nw || old === nw) {
+    return { project: false, costs: 0, andone: 0, invoices: 0 };
+  }
+  // 1) projects 행의 이름 (raw=true: 날짜 재해석 방지)
+  const project = await updateRow(
+    "projects",
+    "프로젝트명(내부)",
+    old,
+    { "프로젝트명(내부)": nw },
+    true
+  );
+  // 2) project_costs (인건비/용역비·경비·대표인출)
+  const costs = await updateRowsByMatch(
+    "project_costs",
+    { 프로젝트: old },
+    { 프로젝트: nw },
+    true
+  );
+  // 3) andone — 청구행은 내용==프로젝트명 이라 둘 다, 나머지(수령)는 프로젝트만
+  const claim = await updateRowsByMatch(
+    "andone",
+    { 프로젝트: old, 내용: old },
+    { 프로젝트: nw, 내용: nw },
+    true
+  );
+  const rest = await updateRowsByMatch(
+    "andone",
+    { 프로젝트: old },
+    { 프로젝트: nw },
+    true
+  );
+  // 4) tax_invoices 프로젝트매핑
+  const invoices = await updateRowsByMatch(
+    "tax_invoices",
+    { 프로젝트매핑: old },
+    { 프로젝트매핑: nw },
+    true
+  );
+  return { project, costs, andone: claim + rest, invoices };
+}
+
 /** 원천세 신고 상태 설정(귀속월 단위). 기존 행 정리 후 filed 면 한 행만 기록. */
 export async function setFiling(
   귀속월: string,

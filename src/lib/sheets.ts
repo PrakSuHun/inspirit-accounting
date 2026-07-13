@@ -154,6 +154,32 @@ export async function sheetsUpdateRow(
   return true;
 }
 
+// match 의 모든 컬럼이 일치하는 '모든' 행을 patch 로 갱신 (프로젝트명 cascade 용)
+export async function sheetsUpdateRowsByMatch(
+  name: string,
+  match: Record<string, string | number>,
+  patch: Record<string, string | number>,
+  raw = false
+): Promise<number> {
+  const doc = await getDoc();
+  const sheet = doc.sheetsByTitle[name];
+  if (!sheet) return 0;
+  const rows = await sheet.getRows();
+  let n = 0;
+  for (const row of rows) {
+    if (
+      Object.entries(match).every(
+        ([k, v]) => String(row.get(k)) === String(v)
+      )
+    ) {
+      for (const [k, val] of Object.entries(patch)) row.set(k, val);
+      await row.save(raw ? { raw: true } : undefined);
+      n++;
+    }
+  }
+  return n;
+}
+
 // 값(serial 숫자·"2026-06"·"2026. 6." 등)을 YYYY-MM 으로 정규화
 function ymOf(v: unknown): string {
   if (v == null || v === "") return "";

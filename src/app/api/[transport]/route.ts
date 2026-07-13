@@ -1,7 +1,12 @@
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 import { loadLedger, loadAndone } from "@/lib/data";
-import { appendRows, updateRow, deleteRowByMatch } from "@/lib/write";
+import {
+  appendRows,
+  updateRow,
+  deleteRowByMatch,
+  renameProject,
+} from "@/lib/write";
 import { won } from "@/lib/format";
 
 // ── 인스피릿 장부 MCP 서버 ────────────────────────────────────────
@@ -333,6 +338,183 @@ const handler = createMcpHandler(
           return ok(`✅ 공통경비 기록: [${구분}] ${항목 || ""} ${won(금액)}.`);
         } catch (e) {
           return fail(`추가 실패: ${(e as Error).message}`);
+        }
+      }
+    );
+
+    // ── 프로젝트 지출(경비/용역비/대표인출) ────────────────────────
+    server.registerTool(
+      "add_project_cost",
+      {
+        title: "프로젝트 지출 기록",
+        description:
+          "특정 프로젝트에 경비/외주 용역비/대표인출을 기록(project_costs). 세금계산서 매입·영수증을 해당 프로젝트 원가로 넣을 때 사용. 프로젝트명은 list_projects 의 정확한 이름.",
+        inputSchema: {
+          프로젝트: z.string().describe("연결 프로젝트명(정확히 일치)"),
+          금액: z.number().positive().describe("금액(원)"),
+          구분: z
+            .enum(["경비", "용역비", "대표인출"])
+            .optional()
+            .describe("기본: 경비"),
+          내용: z.string().optional().describe("내용/품목"),
+          날짜: z.string().optional().describe("지출일 YYYY-MM-DD (기본: 오늘)"),
+          파트너: z.string().optional().describe("거래처/지급처"),
+        },
+      },
+      async ({ 프로젝트, 금액, 구분, 내용, 날짜, 파트너 }) => {
+        try {
+          const l = await loadLedger();
+          if (!l.projects.some((p) => p["프로젝트명(내부)"] === 프로젝트.trim())) {
+            const cand = l.projects
+              .map((x) => x["프로젝트명(내부)"])
+              .filter((n) => n && n.includes(프로젝트.trim()))
+              .slice(0, 5);
+            return fail(
+              `'${프로젝트}' 프로젝트 없음.${cand.length ? ` 비슷한 것: ${cand.join(", ")}` : " list_projects 로 확인."}`
+            );
+          }
+          await appendRows("project_costs", [
+            {
+              프로젝트: 프로젝트.trim(),
+              구분: 구분 || "경비",
+              지출일: 날짜 || today(),
+              내용: 내용 || "",
+              금액,
+              파트너: 파트너 || "",
+              지급여부: "지급 완료",
+              선금여부: "",
+            },
+          ]);
+          return ok(
+            `✅ 프로젝트 지출 기록: [${프로젝트}] ${구분 || "경비"} ${내용 || ""} ${won(금액)}.`
+          );
+        } catch (e) {
+          return fail(`추가 실패: ${(e as Error).message}`);
+        }
+      }
+    );
+
+    // ── 프로젝트 생성 ──────────────────────────────────────────────
+    server.registerTool(
+      "add_project",
+      {
+        title: "프로젝트 생성",
+        description:
+          "새 프로젝트를 만듦(projects). 부가세 미지정 시 공급가의 10%, 계약합계는 공급가+부가세로 자동. 나중에 rename_project 로 세금계산서 내역명과 일치시킬 수 있음.",
+        inputSchema: {
+          이름: z.string().describe("프로젝트명(내부, 임의로 지어도 됨)"),
+          공급가: z.number().nonnegative().describe("공급가(부가세 제외, 원)"),
+          클라이언트: z.string().optional().describe("클라이언트/거래처"),
+          부가세: z.number().optional().describe("부가세(미지정 시 공급가의 10%)"),
+          납품일: z.string().optional().describe("납품일 YYYY-MM-DD"),
+          상태: z.string().optional().describe("기본: 작업중"),
+        },
+      },
+      async ({ 이름, 공급가, 클라이언트, 부가세, 납품일, 상태 }) => {
+        try {
+          const l = await loadLedger();
+          if (l.projects.some((p) => p["프로젝트명(내부)"] === 이름.trim())) {
+            return fail(`'${이름}' 프로젝트가 이미 있습니다.`);
+          }
+          const vat = 부가세 != null ? 부가세 : Math.round(공급가 * 0.1);
+          await appendRows("projects", [
+            {
+              "프로젝트명(내부)": 이름.trim(),
+              클라이언트: 클라이언트 || "",
+              납품일: 납품일 || "",
+              상태: 상태 || "작업중",
+              공급가,
+              부가세: vat,
+              계약합계: 공급가 + vat,
+              정산상태: "작업중",
+              계산서매핑: "",
+            },
+          ]);
+          return ok(
+            `✅ 프로젝트 생성: ${이름} (공급가 ${won(공급가)} + 부가세 ${won(vat)} = ${won(공급가 + vat)}).`
+          );
+        } catch (e) {
+          return fail(`생성 실패: ${(e as Error).message}`);
+        }
+      }
+    );
+
+    // ── 세금계산서 기록 ────────────────────────────────────────────
+    server.registerTool(
+      "add_tax_invoice",
+      {
+        title: "세금계산서 기록",
+        description:
+          "발행/수취한 세금계산서를 기록(tax_invoices). 매출=우리가 발행, 매입=받은 것. 세액 미지정 시 공급가의 10%. 프로젝트매핑에 연결 프로젝트명을 넣으면 프로젝트와 연결됨.",
+        inputSchema: {
+          구분: z.enum(["매출", "매입"]).describe("매출(발행) 또는 매입(수취)"),
+          거래처: z.string().describe("거래처명"),
+          공급가: z.number().describe("공급가(원)"),
+          세액: z.number().optional().describe("세액(미지정 시 공급가의 10%)"),
+          작성일: z.string().optional().describe("작성일 YYYY-MM-DD (기본: 오늘)"),
+          계산서품명: z.string().optional().describe("품목/내역명"),
+          프로젝트매핑: z.string().optional().describe("연결 프로젝트명(선택)"),
+        },
+      },
+      async ({ 구분, 거래처, 공급가, 세액, 작성일, 계산서품명, 프로젝트매핑 }) => {
+        try {
+          const vat = 세액 != null ? 세액 : Math.round(공급가 * 0.1);
+          await appendRows("tax_invoices", [
+            {
+              구분,
+              작성일: 작성일 || today(),
+              승인번호: "",
+              거래처,
+              공급가,
+              세액: vat,
+              합계: 공급가 + vat,
+              계산서품명: 계산서품명 || "",
+              종류: "",
+              프로젝트매핑: 프로젝트매핑 || "",
+            },
+          ]);
+          return ok(
+            `✅ 세금계산서(${구분}) 기록: ${거래처} ${계산서품명 || ""} 공급가 ${won(공급가)} + 세액 ${won(vat)}.`
+          );
+        } catch (e) {
+          return fail(`추가 실패: ${(e as Error).message}`);
+        }
+      }
+    );
+
+    // ── 프로젝트명 변경 (연결 cascade) ─────────────────────────────
+    server.registerTool(
+      "rename_project",
+      {
+        title: "프로젝트명 변경(연결 유지)",
+        description:
+          "프로젝트 이름을 바꾸면서 연결된 인건비·앤드원·세금계산서(project_costs·andone·tax_invoices)의 프로젝트명을 한 번에 같이 변경. 임의로 지은 이름을 세금계산서 내역명과 일치시킬 때 사용. 연결이 끊기지 않음.",
+        inputSchema: {
+          기존이름: z.string().describe("현재 프로젝트명(정확히 일치)"),
+          새이름: z.string().describe("바꿀 이름(예: 세금계산서 내역명)"),
+        },
+      },
+      async ({ 기존이름, 새이름 }) => {
+        try {
+          const l = await loadLedger();
+          if (!l.projects.some((p) => p["프로젝트명(내부)"] === 기존이름.trim())) {
+            const cand = l.projects
+              .map((x) => x["프로젝트명(내부)"])
+              .filter((n) => n && n.includes(기존이름.trim()))
+              .slice(0, 5);
+            return fail(
+              `'${기존이름}' 프로젝트 없음.${cand.length ? ` 비슷한 것: ${cand.join(", ")}` : " list_projects 로 확인."}`
+            );
+          }
+          if (l.projects.some((p) => p["프로젝트명(내부)"] === 새이름.trim())) {
+            return fail(`'${새이름}' 이름이 이미 있습니다. 다른 이름을 쓰세요.`);
+          }
+          const r = await renameProject(기존이름.trim(), 새이름.trim());
+          return ok(
+            `✅ '${기존이름}' → '${새이름}' 변경 완료. 연결 반영: 인건비/지출 ${r.costs}건, 앤드원 ${r.andone}건, 세금계산서 ${r.invoices}건.`
+          );
+        } catch (e) {
+          return fail(`변경 실패: ${(e as Error).message}`);
         }
       }
     );

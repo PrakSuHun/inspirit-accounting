@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateRow, appendRows, deleteRowByMatch } from "@/lib/write";
+import {
+  updateRow,
+  appendRows,
+  deleteRowByMatch,
+  renameProject,
+} from "@/lib/write";
+
+// 공급가/부가세가 함께 오면 계약합계 자동 갱신
+function applyContractTotal(patch: Record<string, unknown>) {
+  if (patch.공급가 != null && patch.부가세 != null) {
+    patch.계약합계 = (Number(patch.공급가) || 0) + (Number(patch.부가세) || 0);
+  }
+}
 
 // 프로젝트 생성/수정 → projects 탭 write
 export async function POST(req: NextRequest) {
@@ -46,14 +58,25 @@ export async function POST(req: NextRequest) {
     if (!name || !patch) {
       return NextResponse.json({ ok: false, error: "잘못된 요청" }, { status: 400 });
     }
-    // 공급가/부가세 수정 시 계약합계 자동 갱신
-    if (patch.공급가 != null || patch.부가세 != null) {
-      const 공급가 = Number(patch.공급가 ?? 0);
-      const 부가세 = Number(patch.부가세 ?? 0);
-      if (patch.공급가 != null && patch.부가세 != null) {
-        patch.계약합계 = 공급가 + 부가세;
+    // 이름 변경이면 연결(인건비·앤드원·세금계산서)까지 cascade 후 나머지 필드 반영
+    const newName = patch["프로젝트명(내부)"];
+    if (newName && String(newName).trim() && String(newName).trim() !== name) {
+      const cascade = await renameProject(name, String(newName).trim());
+      delete patch["프로젝트명(내부)"];
+      // 이름 외 다른 필드가 있으면 새 이름 기준으로 마저 반영
+      if (Object.keys(patch).length) {
+        applyContractTotal(patch);
+        await updateRow(
+          "projects",
+          "프로젝트명(내부)",
+          String(newName).trim(),
+          patch
+        );
       }
+      return NextResponse.json({ ok: cascade.project, cascade });
     }
+    // 공급가/부가세 수정 시 계약합계 자동 갱신
+    applyContractTotal(patch);
     const ok = await updateRow("projects", "프로젝트명(내부)", name, patch);
     return NextResponse.json({ ok });
   } catch (e) {
