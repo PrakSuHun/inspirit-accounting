@@ -528,13 +528,23 @@ const handler = createMcpHandler(
 );
 
 // ── 토큰 인증 래퍼 ────────────────────────────────────────────────
+// 헤더(x-api-key / Bearer) 또는 URL 쿼리(?key=…) 로 인증.
+// 쿼리 방식은 헤더 인증(베타)이 안 열린 클라이언트에서 'URL만 붙여넣기'로 연결 가능.
 function authorize(req: Request): boolean {
   const token = process.env.MCP_TOKEN;
   if (!token) return false; // 토큰 미설정 시 전부 차단(안전)
   const xkey = req.headers.get("x-api-key");
-  const auth = req.headers.get("authorization") || "";
-  const bearer = auth.replace(/^Bearer\s+/i, "");
-  return xkey === token || bearer === token;
+  const bearer = (req.headers.get("authorization") || "").replace(
+    /^Bearer\s+/i,
+    ""
+  );
+  let qkey: string | null = null;
+  try {
+    qkey = new URL(req.url).searchParams.get("key");
+  } catch {
+    /* URL 파싱 실패 무시 */
+  }
+  return xkey === token || bearer === token || qkey === token;
 }
 
 async function guarded(req: Request): Promise<Response> {
