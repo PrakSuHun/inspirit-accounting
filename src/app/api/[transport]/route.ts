@@ -202,7 +202,7 @@ const handler = createMcpHandler(
         description:
           "다른 업체를 통해 받은 돈(부분 수령 포함)을 앤드원 정산에 기록. 금액은 필수, 날짜/경로업체/내용/프로젝트는 선택.",
         inputSchema: {
-          금액: z.number().positive().describe("받은 금액(원)"),
+          금액: z.coerce.number().positive().describe("받은 금액(원)"),
           날짜: z.string().optional().describe("받은 날짜 YYYY-MM-DD (기본: 오늘)"),
           경로업체: z.string().optional().describe("어느 업체 통해 받았는지"),
           내용: z.string().optional().describe("무슨 건인지 메모"),
@@ -244,7 +244,7 @@ const handler = createMcpHandler(
           "앤드원 정산에서만 항목을 삭제(프로젝트 기록엔 영향 없음). 정산 완료돼 정리하고 싶을 때 사용. andone_summary 로 확인한 값과 정확히 일치시켜야 함.",
         inputSchema: {
           구분: z.enum(["청구", "수령"]).describe("청구(받아야 할 돈) 또는 수령(받은 돈)"),
-          금액: z.number().describe("삭제할 항목의 금액"),
+          금액: z.coerce.number().describe("삭제할 항목의 금액"),
           날짜: z.string().optional().describe("항목 날짜 YYYY-MM-DD"),
           내용: z.string().optional().describe("항목 내용(프로젝트명 등)"),
           경로업체: z.string().optional().describe("수령 항목의 경로업체"),
@@ -275,10 +275,19 @@ const handler = createMcpHandler(
           "프리랜서에게 인건비 지급 기록(사업소득 3.3% 원천세는 앱에서 자동 계산). project_costs(용역비)로 저장되고 파트너 명단이 자동 관리됨.",
         inputSchema: {
           수령인: z.string().describe("받는 사람 이름"),
-          금액: z.number().positive().describe("지급총액(세전, 원)"),
+          금액: z.coerce.number().positive().describe("지급총액(세전, 원)"),
           날짜: z.string().optional().describe("지급일 YYYY-MM-DD (기본: 오늘)"),
           프로젝트: z.string().optional().describe("연결 프로젝트(기본: 인건비)"),
-          선금: z.boolean().optional().describe("선금통장 선지급 여부"),
+          선금: z
+            .preprocess(
+              (v) =>
+                typeof v === "string"
+                  ? v === "true" || v === "1" || v === "예"
+                  : v,
+              z.boolean()
+            )
+            .optional()
+            .describe("선금통장 선지급 여부"),
           주민번호: z.string().optional().describe("주민번호(지급명세서용, 선택)"),
         },
       },
@@ -320,7 +329,7 @@ const handler = createMcpHandler(
           "판관비/공통경비 지출 기록(common_expenses). 구분(예: 구독비·회식비·통신비 등)과 금액 필수.",
         inputSchema: {
           구분: z.string().describe("경비 구분(예: 구독비, 간식/회식비, 통신비)"),
-          금액: z.number().positive().describe("금액(원)"),
+          금액: z.coerce.number().positive().describe("금액(원)"),
           항목: z.string().optional().describe("세부 항목/내용"),
           날짜: z.string().optional().describe("지출일 YYYY-MM-DD (기본: 오늘)"),
         },
@@ -351,7 +360,7 @@ const handler = createMcpHandler(
           "특정 프로젝트에 경비/외주 용역비/대표인출을 기록(project_costs). 세금계산서 매입·영수증을 해당 프로젝트 원가로 넣을 때 사용. 프로젝트명은 list_projects 의 정확한 이름.",
         inputSchema: {
           프로젝트: z.string().describe("연결 프로젝트명(정확히 일치)"),
-          금액: z.number().positive().describe("금액(원)"),
+          금액: z.coerce.number().positive().describe("금액(원)"),
           구분: z
             .enum(["경비", "용역비", "대표인출"])
             .optional()
@@ -403,9 +412,9 @@ const handler = createMcpHandler(
           "새 프로젝트를 만듦(projects). 부가세 미지정 시 공급가의 10%, 계약합계는 공급가+부가세로 자동. 나중에 rename_project 로 세금계산서 내역명과 일치시킬 수 있음.",
         inputSchema: {
           이름: z.string().describe("프로젝트명(내부, 임의로 지어도 됨)"),
-          공급가: z.number().nonnegative().describe("공급가(부가세 제외, 원)"),
+          공급가: z.coerce.number().nonnegative().describe("공급가(부가세 제외, 원)"),
           클라이언트: z.string().optional().describe("클라이언트/거래처"),
-          부가세: z.number().optional().describe("부가세(미지정 시 공급가의 10%)"),
+          부가세: z.coerce.number().optional().describe("부가세(미지정 시 공급가의 10%)"),
           납품일: z.string().optional().describe("납품일 YYYY-MM-DD"),
           상태: z.string().optional().describe("기본: 작업중"),
         },
@@ -449,8 +458,8 @@ const handler = createMcpHandler(
         inputSchema: {
           구분: z.enum(["매출", "매입"]).describe("매출(발행) 또는 매입(수취)"),
           거래처: z.string().describe("거래처명"),
-          공급가: z.number().describe("공급가(원)"),
-          세액: z.number().optional().describe("세액(미지정 시 공급가의 10%)"),
+          공급가: z.coerce.number().describe("공급가(원)"),
+          세액: z.coerce.number().optional().describe("세액(미지정 시 공급가의 10%)"),
           작성일: z.string().optional().describe("작성일 YYYY-MM-DD (기본: 오늘)"),
           계산서품명: z.string().optional().describe("품목/내역명"),
           프로젝트매핑: z.string().optional().describe("연결 프로젝트명(선택)"),
