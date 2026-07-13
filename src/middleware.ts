@@ -5,9 +5,12 @@ export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // 로그인 페이지·API·정적파일은 통과
+  // MCP 커넥터(/api/mcp·/api/sse)는 쿠키 대신 자체 토큰(MCP_TOKEN)으로 인증하므로 통과
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/login") ||
+    pathname.startsWith("/api/mcp") ||
+    pathname.startsWith("/api/sse") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
   ) {
