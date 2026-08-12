@@ -18,6 +18,8 @@ export async function POST(req: NextRequest) {
     }
     const 수령인 = String(p.수령인).trim();
     if (p.주민번호) await upsertFreelancer(수령인, String(p.주민번호));
+    // 사용자가 내용(예: 영상 편집)을 적으면 그대로, 없으면 기본 "인건비(이름)"
+    const 내용 = String(p.내용 ?? "").trim() || `인건비(${수령인})`;
 
     await appendRows(
       "project_costs",
@@ -26,7 +28,7 @@ export async function POST(req: NextRequest) {
           프로젝트: String(p.프로젝트 || "인건비"),
           구분: "용역비",
           지출일: String(p.지급일 ?? ""),
-          내용: `인건비(${수령인})`,
+          내용,
           금액: Number(p.금액) || 0,
           파트너: 수령인,
           지급여부: "지급 완료",

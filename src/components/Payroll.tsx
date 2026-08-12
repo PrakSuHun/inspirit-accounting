@@ -276,6 +276,13 @@ export default function Payroll({
                       .sort((a, b) => b.지급일.localeCompare(a.지급일))
                       .map((pay, i) => {
                         const 선금 = !!pay.선금여부;
+                        // 내용(예: 영상 편집) — 자동 기본값 "인건비(이름)" 은 숨김
+                        const desc =
+                          pay.내용 &&
+                          pay.내용 !== `인건비(${pay.수령인})` &&
+                          pay.내용 !== pay.프로젝트
+                            ? pay.내용
+                            : "";
                         return (
                           <div
                             key={i}
@@ -294,6 +301,11 @@ export default function Payroll({
                                   </span>
                                 )}
                               </div>
+                              {desc && (
+                                <div className="text-[11px] text-slate-500 truncate">
+                                  {desc}
+                                </div>
+                              )}
                               <div className="text-[11px] text-slate-400">
                                 {pay.지급일}
                               </div>
@@ -509,6 +521,7 @@ function AddPayment({
     주민번호: "",
     금액: "",
     프로젝트: "",
+    내용: "",
     선금: false,
   });
 
@@ -545,6 +558,7 @@ function AddPayment({
         주민번호: "",
         금액: "",
         프로젝트: "",
+        내용: "",
         선금: false,
       });
       setOpen(false);
@@ -609,6 +623,12 @@ function AddPayment({
         options={[...projects].reverse()}
         placeholder="연결 프로젝트(선택)"
       />
+      <input
+        value={f.내용}
+        onChange={(e) => setF({ ...f, 내용: e.target.value })}
+        placeholder="내용 (예: 영상 편집) — 선택"
+        className="pinp w-full"
+      />
       <label className="flex items-center gap-2 text-sm text-slate-600 select-none">
         <input
           type="checkbox"
@@ -655,6 +675,11 @@ function EditPayment({
     수령인: pay.수령인,
     금액: String(pay.지급총액),
     프로젝트: pay.프로젝트 && pay.프로젝트 !== "인건비" ? pay.프로젝트 : "",
+    // 자동 기본값 "인건비(이름)" 은 빈칸으로 (직접 적은 내용만 노출)
+    내용:
+      pay.내용 && pay.내용 !== `인건비(${pay.수령인})` && pay.내용 !== pay.프로젝트
+        ? pay.내용
+        : "",
     선금: !!pay.선금여부,
   });
   const 금액n = Number(f.금액) || 0;
@@ -689,7 +714,7 @@ function EditPayment({
           프로젝트: f.프로젝트 || "인건비",
           구분: "용역비",
           지출일: f.지급일,
-          내용: newName !== pay.수령인 ? `인건비(${newName})` : pay.내용,
+          내용: f.내용.trim() || `인건비(${newName})`,
           금액: 금액n,
           파트너: newName,
           지급여부: "지급 완료",
@@ -746,6 +771,12 @@ function EditPayment({
           onChange={(v) => setF({ ...f, 프로젝트: v })}
           options={[...projects].reverse()}
           placeholder="연결 프로젝트(선택)"
+        />
+        <input
+          value={f.내용}
+          onChange={(e) => setF({ ...f, 내용: e.target.value })}
+          placeholder="내용 (예: 영상 편집) — 선택"
+          className="pinp w-full"
         />
         <label className="flex items-center gap-2 text-sm text-slate-600 select-none">
           <input
