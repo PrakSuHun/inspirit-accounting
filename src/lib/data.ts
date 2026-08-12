@@ -236,14 +236,18 @@ export async function loadFilings(): Promise<
 // ── 앤드원 정산 장부 (andone 탭, 없으면 빈 배열) ──────────────────
 export async function loadAndone(): Promise<import("./types").AndoneEntry[]> {
   const raw = await getRawRows();
-  return (raw["andone"] ?? []).map((r) => ({
-    날짜: toDateStr(r["날짜"]),
-    구분: String(r["구분"] ?? "") === "수령" ? "수령" : "청구",
-    내용: String(r["내용"] ?? ""),
-    금액: toNum(r["금액"]),
-    경로업체: String(r["경로업체"] ?? ""),
-    프로젝트: String(r["프로젝트"] ?? ""),
-  }));
+  return (raw["andone"] ?? []).map((r) => {
+    const ex = String(r["집계제외"] ?? "").trim().toUpperCase();
+    return {
+      날짜: toDateStr(r["날짜"]),
+      구분: String(r["구분"] ?? "") === "수령" ? "수령" : "청구",
+      내용: String(r["내용"] ?? ""),
+      금액: toNum(r["금액"]),
+      경로업체: String(r["경로업체"] ?? ""),
+      프로젝트: String(r["프로젝트"] ?? ""),
+      집계제외: ex === "Y" || ex === "TRUE" || ex === "1",
+    };
+  });
 }
 
 // ── 프로젝트별 집계 (수익성) ──────────────────────────────────────

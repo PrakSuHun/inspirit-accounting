@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   updateRow,
   appendRows,
-  deleteRowByMatch,
+  deleteProject,
   renameProject,
 } from "@/lib/write";
 
@@ -49,8 +49,9 @@ export async function POST(req: NextRequest) {
       if (!body.name) {
         return NextResponse.json({ ok: false, error: "잘못된 요청" }, { status: 400 });
       }
-      const ok = await deleteRowByMatch("projects", { "프로젝트명(내부)": body.name });
-      return NextResponse.json({ ok });
+      // 프로젝트 + 연결된 인건비/지출·앤드원 삭제, 세금계산서는 연결만 해제
+      const cascade = await deleteProject(String(body.name));
+      return NextResponse.json({ ok: cascade.project, cascade });
     }
 
     // update: {name, patch}

@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { won } from "@/lib/format";
 import { Card, SectionTitle } from "@/components/ui";
-import { Plus, X, Trash2, ArrowUpRight } from "lucide-react";
+import { Plus, X, Trash2, ArrowUpRight, EyeOff, Eye } from "lucide-react";
 import type { AndoneEntry } from "@/lib/types";
 
 type ProjOpt = { name: string; client: string; amount: number; date: string };
@@ -19,6 +19,7 @@ export default function Andone({
 }) {
   const router = useRouter();
   const [delKey, setDelKey] = useState<string | null>(null);
+  const [exKey, setExKey] = useState<string | null>(null);
 
   const 청구목록 = useMemo(
     () =>
@@ -41,12 +42,40 @@ export default function Andone({
     [청구목록]
   );
 
-  const 받을총액 = 청구목록.reduce((s, e) => s + e.금액, 0);
-  const 받은총액 = 수령목록.reduce((s, e) => s + e.금액, 0);
+  // 집계제외 표시된 건은 합계에서 뺌 (목록엔 남음)
+  const 받을총액 = 청구목록
+    .filter((e) => !e.집계제외)
+    .reduce((s, e) => s + e.금액, 0);
+  const 받은총액 = 수령목록
+    .filter((e) => !e.집계제외)
+    .reduce((s, e) => s + e.금액, 0);
   const 미수 = 받을총액 - 받은총액;
+  const 제외건수 = entries.filter((e) => e.집계제외).length;
 
   const keyOf = (e: AndoneEntry) =>
     e.구분 + e.날짜 + e.내용 + e.금액 + e.경로업체;
+
+  // 집계제외 토글 (삭제 없이 계산에서만 빼기/되돌리기)
+  async function toggleExclude(e: AndoneEntry) {
+    setExKey(keyOf(e));
+    await fetch("/api/andone", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "exclude",
+        excluded: !e.집계제외,
+        match: {
+          날짜: e.날짜,
+          구분: e.구분,
+          내용: e.내용,
+          금액: e.금액,
+          경로업체: e.경로업체,
+        },
+      }),
+    });
+    setExKey(null);
+    router.refresh();
+  }
 
   // 삭제는 andone 시트에서만 — 프로젝트에는 영향 없음
   async function del(e: AndoneEntry) {
@@ -106,6 +135,11 @@ export default function Andone({
           <div className="text-[11px] mt-3 opacity-85 leading-relaxed">
             세금계산서 발급한 프로젝트를 연결해 받을 돈을 잡고, 다른 업체를 통해 받은
             돈을 빼면 앤드원에 청구할 차액이 나옵니다.
+            {제외건수 > 0 && (
+              <span className="block mt-1 opacity-90">
+                · 집계 제외 {제외건수}건은 합계에서 빠져 있어요.
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -129,6 +163,8 @@ export default function Andone({
             tone="claim"
             onDelete={() => del(e)}
             deleting={delKey === keyOf(e)}
+            onToggleExclude={() => toggleExclude(e)}
+            toggling={exKey === keyOf(e)}
           />
         ))}
         {청구목록.length === 0 && (
@@ -146,6 +182,8 @@ export default function Andone({
             tone="receive"
             onDelete={() => del(e)}
             deleting={delKey === keyOf(e)}
+            onToggleExclude={() => toggleExclude(e)}
+            toggling={exKey === keyOf(e)}
           />
         ))}
         {수령목록.length === 0 && <Empty text="받은 돈이 아직 없습니다." />}
@@ -167,24 +205,34 @@ function Row({
   tone,
   onDelete,
   deleting,
+  onToggleExclude,
+  toggling,
 }: {
   e: AndoneEntry;
   tone: "claim" | "receive";
   onDelete: () => void;
   deleting: boolean;
+  onToggleExclude: () => void;
+  toggling: boolean;
 }) {
   const claim = tone === "claim";
+  const excluded = e.집계제외;
   const title = e.내용 || e.프로젝트 || (claim ? "앤드원 청구" : "수령");
   return (
-    <Card className="p-3.5">
+    <Card className={`p-3.5 ${excluded ? "opacity-60" : ""}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <span className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-rose-50 text-rose-500">
             <ArrowUpRight size={16} />
           </span>
           <div className="min-w-0">
-            <div className="text-sm font-medium text-slate-800 truncate">
-              {title}
+            <div className="text-sm font-medium text-slate-800 truncate flex items-center gap-1.5">
+              <span className={excluded ? "line-through" : ""}>{title}</span>
+              {excluded && (
+                <span className="shrink-0 text-[9px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1 py-0.5">
+                  집계 제외
+                </span>
+              )}
             </div>
             <div className="text-[11px] text-slate-400 truncate">
               {e.날짜 || "날짜 없음"}
@@ -194,9 +242,25 @@ function Row({
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-sm font-bold text-slate-900">
+          <span
+            className={`text-sm font-bold text-slate-900 ${
+              excluded ? "line-through" : ""
+            }`}
+          >
             {won(e.금액)}
           </span>
+          <button
+            onClick={onToggleExclude}
+            disabled={toggling}
+            className={`disabled:opacity-40 p-1 ${
+              excluded
+                ? "text-indigo-400 hover:text-indigo-600"
+                : "text-slate-300 hover:text-slate-600"
+            }`}
+            title={excluded ? "집계에 다시 포함" : "이 건만 집계에서 제외"}
+          >
+            {excluded ? <Eye size={15} /> : <EyeOff size={15} />}
+          </button>
           <button
             onClick={onDelete}
             disabled={deleting}

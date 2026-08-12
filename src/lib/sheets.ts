@@ -180,6 +180,39 @@ export async function sheetsUpdateRowsByMatch(
   return n;
 }
 
+// match 일치 행의 특정 플래그 컬럼을 설정. 헤더가 없으면 추가(시트 확장 포함).
+// andone 집계제외 토글용 — 기존 시트에 컬럼이 없어도 안전하게 켜고 끔.
+export async function sheetsSetFlag(
+  name: string,
+  match: Record<string, string | number>,
+  column: string,
+  value: string
+): Promise<number> {
+  const doc = await getDoc();
+  const sheet = doc.sheetsByTitle[name];
+  if (!sheet) return 0;
+  const rows = await sheet.getRows();
+  // 헤더에 컬럼 없으면 추가 (필요 시 시트 열 확장)
+  if (!sheet.headerValues.includes(column)) {
+    const next = [...sheet.headerValues, column];
+    if (next.length > sheet.columnCount) {
+      await sheet.resize({ rowCount: sheet.rowCount, columnCount: next.length });
+    }
+    await sheet.setHeaderRow(next);
+  }
+  let n = 0;
+  for (const row of rows) {
+    if (
+      Object.entries(match).every(([k, v]) => String(row.get(k)) === String(v))
+    ) {
+      row.set(column, value);
+      await row.save({ raw: true });
+      n++;
+    }
+  }
+  return n;
+}
+
 // 값(serial 숫자·"2026-06"·"2026. 6." 등)을 YYYY-MM 으로 정규화
 function ymOf(v: unknown): string {
   if (v == null || v === "") return "";
@@ -240,4 +273,21 @@ export async function sheetsDeleteRowByMatch(
   if (!row) return false;
   await row.delete();
   return true;
+}
+
+// match 의 모든 컬럼이 일치하는 '모든' 행 삭제. 삭제된 행 수 반환.
+export async function sheetsDeleteRowsByMatch(
+  name: string,
+  match: Record<string, string | number>
+): Promise<number> {
+  const doc = await getDoc();
+  const sheet = doc.sheetsByTitle[name];
+  if (!sheet) return 0;
+  const rows = await sheet.getRows();
+  const dead = rows.filter((r) =>
+    Object.entries(match).every(([k, v]) => String(r.get(k)) === String(v))
+  );
+  // 뒤에서부터 삭제해야 인덱스가 안 밀림
+  for (let i = dead.length - 1; i >= 0; i--) await dead[i].delete();
+  return dead.length;
 }

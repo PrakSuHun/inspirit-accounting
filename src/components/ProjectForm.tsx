@@ -72,6 +72,7 @@ export default function ProjectForm({
             action: "update",
             name: initial?.["프로젝트명(내부)"],
             patch: {
+              "프로젝트명(내부)": f["프로젝트명(내부)"].trim(),
               클라이언트: f.클라이언트,
               납품일: f.납품일,
               상태: f.상태,
@@ -108,13 +109,12 @@ export default function ProjectForm({
         <input
           value={f["프로젝트명(내부)"]}
           onChange={(e) => set("프로젝트명(내부)", e.target.value)}
-          disabled={mode === "edit"}
           placeholder="예: 한남대 홍보영상"
-          className="inp disabled:bg-slate-100 disabled:text-slate-400"
+          className="inp"
         />
         {mode === "edit" && (
           <p className="text-[11px] text-slate-400 mt-1">
-            프로젝트명은 지출 연결 때문에 수정할 수 없어요.
+            이름을 바꾸면 연결된 인건비·앤드원·세금계산서도 함께 바뀌어요.
           </p>
         )}
       </Field>
@@ -202,7 +202,7 @@ export default function ProjectForm({
           onClick={async () => {
             if (
               !confirm(
-                `"${initial?.["프로젝트명(내부)"]}" 프로젝트를 삭제할까요? (지출 내역은 남습니다)`
+                `"${initial?.["프로젝트명(내부)"]}" 프로젝트를 삭제할까요?\n연결된 인건비·지출·앤드원 내역도 함께 삭제됩니다. (세금계산서는 연결만 해제)`
               )
             )
               return;

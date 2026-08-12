@@ -167,6 +167,24 @@ export async function renameProject(
   return { project, costs, andone: claim + rest, invoices };
 }
 
+/**
+ * 앤드원 항목의 집계제외 플래그 설정. 삭제하지 않고 미수/합계 계산에서만 뺌.
+ * match 로 해당 행을 찾아 집계제외 컬럼을 "Y"(제외) 또는 ""(포함) 로 설정.
+ * 시트에 컬럼이 없으면 자동 추가. 갱신된 행 수 반환.
+ */
+export async function setAndoneExclude(
+  match: Record<string, string | number>,
+  excluded: boolean
+): Promise<number> {
+  const value = excluded ? "Y" : "";
+  if (useSheets()) {
+    const { sheetsSetFlag } = await import("./sheets");
+    return sheetsSetFlag("andone", match, "집계제외", value);
+  }
+  // 로컬 xlsx: json_to_sheet 가 새 컬럼을 자동 포함
+  return updateRowsByMatch("andone", match, { 집계제외: value }, true);
+}
+
 /** 원천세 신고 상태 설정(귀속월 단위). 기존 행 정리 후 filed 면 한 행만 기록. */
 export async function setFiling(
   귀속월: string,
@@ -216,4 +234,60 @@ export async function deleteRowByMatch(
   wb.Sheets[sheetName] = XLSX.utils.json_to_sheet(rows);
   writeWb(wb);
   return true;
+}
+
+/** match 의 모든 컬럼이 일치하는 '모든' 행을 삭제. 삭제된 행 수 반환. */
+export async function deleteRowsByMatch(
+  sheetName: string,
+  match: Record<string, string | number>
+): Promise<number> {
+  if (useSheets()) {
+    const { sheetsDeleteRowsByMatch } = await import("./sheets");
+    return sheetsDeleteRowsByMatch(sheetName, match);
+  }
+  const wb = readWb();
+  const ws = wb.Sheets[sheetName];
+  if (!ws) return 0;
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+    defval: "",
+    raw: true,
+  });
+  const kept = rows.filter(
+    (r) => !Object.entries(match).every(([k, v]) => String(r[k]) === String(v))
+  );
+  const n = rows.length - kept.length;
+  if (n > 0) {
+    wb.Sheets[sheetName] = XLSX.utils.json_to_sheet(kept);
+    writeWb(wb);
+  }
+  return n;
+}
+
+/**
+ * 프로젝트 삭제 + 연결 정리(cascade).
+ * projects 행과, 그 프로젝트에 연결된 project_costs(인건비/용역비·경비·대표인출)·
+ * andone 정산행을 함께 삭제. tax_invoices 는 공식 발급기록이라 지우지 않고
+ * 프로젝트매핑만 비워서(연결 해제) 세금 집계는 유지.
+ * → 삭제 후 인건비 탭 등에 고아 데이터가 남지 않음.
+ */
+export async function deleteProject(name: string): Promise<{
+  project: boolean;
+  costs: number;
+  andone: number;
+  invoicesUnlinked: number;
+}> {
+  const nm = name.trim();
+  if (!nm) return { project: false, costs: 0, andone: 0, invoicesUnlinked: 0 };
+  const project = await deleteRowByMatch("projects", {
+    "프로젝트명(내부)": nm,
+  });
+  const costs = await deleteRowsByMatch("project_costs", { 프로젝트: nm });
+  const andone = await deleteRowsByMatch("andone", { 프로젝트: nm });
+  const invoicesUnlinked = await updateRowsByMatch(
+    "tax_invoices",
+    { 프로젝트매핑: nm },
+    { 프로젝트매핑: "" },
+    true
+  );
+  return { project, costs, andone, invoicesUnlinked };
 }

@@ -81,8 +81,9 @@ const handler = createMcpHandler(
       async () => {
         try {
           const entries = await loadAndone();
-          const 청구 = entries.filter((e) => e.구분 === "청구");
-          const 수령 = entries.filter((e) => e.구분 === "수령");
+          // 집계제외 표시된 건은 합계에서 제외 (앱 앤드원 탭과 동일)
+          const 청구 = entries.filter((e) => e.구분 === "청구" && !e.집계제외);
+          const 수령 = entries.filter((e) => e.구분 === "수령" && !e.집계제외);
           const 받을 = 청구.reduce((s, e) => s + e.금액, 0);
           const 받은 = 수령.reduce((s, e) => s + e.금액, 0);
           const summary = {
