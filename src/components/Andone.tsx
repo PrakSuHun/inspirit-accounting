@@ -3,8 +3,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { won } from "@/lib/format";
 import { Card, SectionTitle } from "@/components/ui";
-import { Plus, X, Trash2, ArrowDownLeft, ArrowUpRight } from "lucide-react";
-import MoneyInput from "./MoneyInput";
+import { Plus, X, Trash2, ArrowUpRight } from "lucide-react";
 import type { AndoneEntry } from "@/lib/types";
 
 type ProjOpt = { name: string; client: string; amount: number; date: string };
@@ -180,12 +179,8 @@ function Row({
     <Card className="p-3.5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span
-            className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-full ${
-              claim ? "bg-rose-50 text-rose-500" : "bg-emerald-50 text-emerald-600"
-            }`}
-          >
-            {claim ? <ArrowUpRight size={16} /> : <ArrowDownLeft size={16} />}
+          <span className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-rose-50 text-rose-500">
+            <ArrowUpRight size={16} />
           </span>
           <div className="min-w-0">
             <div className="text-sm font-medium text-slate-800 truncate">
@@ -199,12 +194,7 @@ function Row({
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <span
-            className={`text-sm font-bold ${
-              claim ? "text-slate-900" : "text-emerald-600"
-            }`}
-          >
-            {claim ? "" : "−"}
+          <span className="text-sm font-bold text-slate-900">
             {won(e.금액)}
           </span>
           <button
@@ -231,32 +221,24 @@ function AddEntry({
   claimedNames: Set<string>;
 }) {
   const router = useRouter();
-  const today = new Date().toISOString().slice(0, 10);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [mode, setMode] = useState<"청구" | "수령">("청구");
 
-  // 청구: 프로젝트 연결 (금액·날짜 자동)
+  // 청구·수령 공통: 프로젝트 연결 (금액·날짜 자동)
   const [claim, setClaim] = useState<ProjOpt | null>(null);
-  // 수령: 직접 입력
-  const [r, setR] = useState({
-    날짜: today,
-    금액: "",
-    내용: "",
-    경로업체: "",
-    프로젝트: "",
-  });
+  // 수령: 어느 업체 통해 받았는지 (선택)
+  const [via, setVia] = useState("");
 
   const availProjects = useMemo(
     () => projects.filter((p) => !claimedNames.has(p.name)),
     [projects, claimedNames]
   );
-  const projectNames = useMemo(() => projects.map((p) => p.name), [projects]);
 
   function resetAndClose() {
     setClaim(null);
-    setR({ 날짜: today, 금액: "", 내용: "", 경로업체: "", 프로젝트: "" });
+    setVia("");
     setErr("");
     setOpen(false);
   }
@@ -279,33 +261,18 @@ function AddEntry({
 
   function submit(ev: React.FormEvent) {
     ev.preventDefault();
-    if (mode === "청구") {
-      if (!claim) {
-        setErr("연결할 프로젝트를 선택하세요.");
-        return;
-      }
-      post({
-        날짜: claim.date,
-        구분: "청구",
-        내용: claim.name,
-        금액: claim.amount,
-        경로업체: "",
-        프로젝트: claim.name,
-      });
-    } else {
-      if (!r.금액 || !Number(r.금액)) {
-        setErr("금액을 입력하세요.");
-        return;
-      }
-      post({
-        날짜: r.날짜,
-        구분: "수령",
-        내용: r.내용,
-        금액: Number(r.금액),
-        경로업체: r.경로업체,
-        프로젝트: r.프로젝트,
-      });
+    if (!claim) {
+      setErr("연결할 프로젝트를 선택하세요.");
+      return;
     }
+    post({
+      날짜: claim.date,
+      구분: mode,
+      내용: claim.name,
+      금액: claim.amount,
+      경로업체: mode === "수령" ? via : "",
+      프로젝트: claim.name,
+    });
   }
 
   if (!open)
@@ -353,52 +320,28 @@ function AddEntry({
         ))}
       </div>
 
+      <ProjectPicker
+        options={mode === "청구" ? availProjects : projects}
+        value={claim}
+        onSelect={setClaim}
+      />
       {mode === "청구" ? (
-        <>
-          <ProjectPicker
-            options={availProjects}
-            value={claim}
-            onSelect={setClaim}
-          />
-          <p className="text-[11px] text-slate-500 leading-relaxed">
-            세금계산서 발급한 프로젝트를 고르면 금액·납품일이 자동으로 들어갑니다.
-            직접 입력할 필요 없어요.
-          </p>
-        </>
+        <p className="text-[11px] text-slate-500 leading-relaxed">
+          세금계산서 발급한 프로젝트를 고르면 금액·납품일이 자동으로 들어갑니다.
+          직접 입력할 필요 없어요.
+        </p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="date"
-              value={r.날짜}
-              onChange={(e) => setR({ ...r, 날짜: e.target.value })}
-              className="pinp"
-            />
-            <MoneyInput
-              value={Number(r.금액) || 0}
-              onChange={(n) => setR({ ...r, 금액: n ? String(n) : "" })}
-              placeholder="받은 금액"
-              className="pinp"
-            />
-          </div>
-          <input
-            value={r.내용}
-            onChange={(e) => setR({ ...r, 내용: e.target.value })}
-            placeholder="내용 (무슨 건인지)"
-            className="pinp w-full"
-          />
           <Typeahead
-            value={r.경로업체}
-            onChange={(v) => setR({ ...r, 경로업체: v })}
+            value={via}
+            onChange={setVia}
             options={vendors}
-            placeholder="어느 업체 통해 받았나요?"
+            placeholder="어느 업체 통해 받았나요? (선택)"
           />
-          <Typeahead
-            value={r.프로젝트}
-            onChange={(v) => setR({ ...r, 프로젝트: v })}
-            options={[...projectNames].reverse()}
-            placeholder="연결 프로젝트(선택)"
-          />
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            받은 프로젝트를 고르면 금액·날짜가 자동으로 들어갑니다. 직접 입력할
+            필요 없어요.
+          </p>
         </>
       )}
 
