@@ -19,18 +19,22 @@ export async function POST(req: NextRequest) {
     const 수령인 = String(p.수령인).trim();
     if (p.주민번호) await upsertFreelancer(수령인, String(p.주민번호));
 
-    await appendRows("project_costs", [
-      {
-        프로젝트: String(p.프로젝트 || "인건비"),
-        구분: "용역비",
-        지출일: String(p.지급일 ?? ""),
-        내용: `인건비(${수령인})`,
-        금액: Number(p.금액) || 0,
-        파트너: 수령인,
-        지급여부: "지급 완료",
-        선금여부: p.선금여부 ? "선금" : "",
-      },
-    ]);
+    await appendRows(
+      "project_costs",
+      [
+        {
+          프로젝트: String(p.프로젝트 || "인건비"),
+          구분: "용역비",
+          지출일: String(p.지급일 ?? ""),
+          내용: `인건비(${수령인})`,
+          금액: Number(p.금액) || 0,
+          파트너: 수령인,
+          지급여부: "지급 완료",
+          선금여부: p.선금여부 ? "선금" : "",
+        },
+      ],
+      true // 날짜를 텍스트로 저장 (구글시트 serial 변환 방지 → 삭제/수정 매칭 안정)
+    );
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json(

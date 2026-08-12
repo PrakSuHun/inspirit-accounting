@@ -296,18 +296,22 @@ const handler = createMcpHandler(
         try {
           const name = 수령인.trim();
           if (주민번호) await upsertFreelancer(name, String(주민번호));
-          await appendRows("project_costs", [
-            {
-              프로젝트: 프로젝트 || "인건비",
-              구분: "용역비",
-              지출일: 날짜 || today(),
-              내용: `인건비(${name})`,
-              금액,
-              파트너: name,
-              지급여부: "지급 완료",
-              선금여부: 선금 ? "선금" : "",
-            },
-          ]);
+          await appendRows(
+            "project_costs",
+            [
+              {
+                프로젝트: 프로젝트 || "인건비",
+                구분: "용역비",
+                지출일: 날짜 || today(),
+                내용: `인건비(${name})`,
+                금액,
+                파트너: name,
+                지급여부: "지급 완료",
+                선금여부: 선금 ? "선금" : "",
+              },
+            ],
+            true // 날짜 텍스트 저장 (serial 변환 방지)
+          );
           const 국세 = Math.floor((금액 * 0.03) / 10) * 10;
           const 지방 = Math.floor((금액 * 0.003) / 10) * 10;
           return ok(
@@ -383,18 +387,22 @@ const handler = createMcpHandler(
               `'${프로젝트}' 프로젝트 없음.${cand.length ? ` 비슷한 것: ${cand.join(", ")}` : " list_projects 로 확인."}`
             );
           }
-          await appendRows("project_costs", [
-            {
-              프로젝트: 프로젝트.trim(),
-              구분: 구분 || "경비",
-              지출일: 날짜 || today(),
-              내용: 내용 || "",
-              금액,
-              파트너: 파트너 || "",
-              지급여부: "지급 완료",
-              선금여부: "",
-            },
-          ]);
+          await appendRows(
+            "project_costs",
+            [
+              {
+                프로젝트: 프로젝트.trim(),
+                구분: 구분 || "경비",
+                지출일: 날짜 || today(),
+                내용: 내용 || "",
+                금액,
+                파트너: 파트너 || "",
+                지급여부: "지급 완료",
+                선금여부: "",
+              },
+            ],
+            true // 날짜 텍스트 저장 (serial 변환 방지)
+          );
           return ok(
             `✅ 프로젝트 지출 기록: [${프로젝트}] ${구분 || "경비"} ${내용 || ""} ${won(금액)}.`
           );

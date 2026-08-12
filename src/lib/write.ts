@@ -1,6 +1,7 @@
 import "server-only";
 import * as XLSX from "xlsx";
 import fs from "node:fs";
+import { rowMatches } from "./match";
 
 const XLSX_PATH = process.env.XLSX_PATH ?? "";
 const useSheets = () => (process.env.DATA_SOURCE ?? "xlsx") === "sheets";
@@ -98,7 +99,7 @@ export async function updateRowsByMatch(
   });
   let n = 0;
   for (const r of rows) {
-    if (Object.entries(match).every(([k, v]) => String(r[k]) === String(v))) {
+    if (rowMatches((k) => r[k], match)) {
       Object.assign(r, patch);
       n++;
     }
@@ -226,9 +227,7 @@ export async function deleteRowByMatch(
     defval: "",
     raw: true,
   });
-  const idx = rows.findIndex((r) =>
-    Object.entries(match).every(([k, v]) => String(r[k]) === String(v))
-  );
+  const idx = rows.findIndex((r) => rowMatches((k) => r[k], match));
   if (idx < 0) return false;
   rows.splice(idx, 1);
   wb.Sheets[sheetName] = XLSX.utils.json_to_sheet(rows);
@@ -252,9 +251,7 @@ export async function deleteRowsByMatch(
     defval: "",
     raw: true,
   });
-  const kept = rows.filter(
-    (r) => !Object.entries(match).every(([k, v]) => String(r[k]) === String(v))
-  );
+  const kept = rows.filter((r) => !rowMatches((k) => r[k], match));
   const n = rows.length - kept.length;
   if (n > 0) {
     wb.Sheets[sheetName] = XLSX.utils.json_to_sheet(kept);

@@ -1,6 +1,7 @@
 import "server-only";
 import { GoogleSpreadsheet } from "google-spreadsheet";
 import { JWT } from "google-auth-library";
+import { rowMatches } from "./match";
 
 // ── Google Sheets 어댑터 (배포/클라우드 데이터 소스) ──────────────
 // 서비스 계정으로 인증해 시트를 DB처럼 읽고 씀.
@@ -167,11 +168,7 @@ export async function sheetsUpdateRowsByMatch(
   const rows = await sheet.getRows();
   let n = 0;
   for (const row of rows) {
-    if (
-      Object.entries(match).every(
-        ([k, v]) => String(row.get(k)) === String(v)
-      )
-    ) {
+    if (rowMatches((k) => row.get(k), match)) {
       for (const [k, val] of Object.entries(patch)) row.set(k, val);
       await row.save(raw ? { raw: true } : undefined);
       n++;
@@ -202,9 +199,7 @@ export async function sheetsSetFlag(
   }
   let n = 0;
   for (const row of rows) {
-    if (
-      Object.entries(match).every(([k, v]) => String(row.get(k)) === String(v))
-    ) {
+    if (rowMatches((k) => row.get(k), match)) {
       row.set(column, value);
       await row.save({ raw: true });
       n++;
@@ -267,9 +262,7 @@ export async function sheetsDeleteRowByMatch(
   const sheet = doc.sheetsByTitle[name];
   if (!sheet) return false;
   const rows = await sheet.getRows();
-  const row = rows.find((r) =>
-    Object.entries(match).every(([k, v]) => String(r.get(k)) === String(v))
-  );
+  const row = rows.find((r) => rowMatches((k) => r.get(k), match));
   if (!row) return false;
   await row.delete();
   return true;
@@ -284,9 +277,7 @@ export async function sheetsDeleteRowsByMatch(
   const sheet = doc.sheetsByTitle[name];
   if (!sheet) return 0;
   const rows = await sheet.getRows();
-  const dead = rows.filter((r) =>
-    Object.entries(match).every(([k, v]) => String(r.get(k)) === String(v))
-  );
+  const dead = rows.filter((r) => rowMatches((k) => r.get(k), match));
   // 뒤에서부터 삭제해야 인덱스가 안 밀림
   for (let i = dead.length - 1; i >= 0; i--) await dead[i].delete();
   return dead.length;

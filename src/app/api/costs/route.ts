@@ -24,18 +24,22 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: "잘못된 요청" }, { status: 400 });
       }
       await deleteRowByMatch("project_costs", m);
-      await appendRows("project_costs", [
-        {
-          프로젝트: String(c.프로젝트),
-          구분: String(c.구분 ?? "경비"),
-          지출일: String(c.지출일 ?? ""),
-          내용: String(c.내용 ?? ""),
-          금액: Number(c.금액) || 0,
-          파트너: String(c.파트너 ?? ""),
-          지급여부: String(c.지급여부 ?? "지급 완료"),
-          선금여부: String(c.선금여부 ?? ""),
-        },
-      ]);
+      await appendRows(
+        "project_costs",
+        [
+          {
+            프로젝트: String(c.프로젝트),
+            구분: String(c.구분 ?? "경비"),
+            지출일: String(c.지출일 ?? ""),
+            내용: String(c.내용 ?? ""),
+            금액: Number(c.금액) || 0,
+            파트너: String(c.파트너 ?? ""),
+            지급여부: String(c.지급여부 ?? "지급 완료"),
+            선금여부: String(c.선금여부 ?? ""),
+          },
+        ],
+        true // 날짜 텍스트 저장 (serial 변환 방지)
+      );
       return NextResponse.json({ ok: true });
     }
 
@@ -47,18 +51,22 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    await appendRows("project_costs", [
-      {
-        프로젝트: String(c.프로젝트),
-        구분: String(c.구분 ?? "경비"),
-        지출일: String(c.지출일 ?? ""),
-        내용: String(c.내용 ?? ""),
-        금액: Number(c.금액) || 0,
-        파트너: String(c.파트너 ?? ""),
-        지급여부: String(c.지급여부 ?? "지급 완료"),
-        선금여부: String(c.선금여부 ?? ""),
-      },
-    ]);
+    await appendRows(
+      "project_costs",
+      [
+        {
+          프로젝트: String(c.프로젝트),
+          구분: String(c.구분 ?? "경비"),
+          지출일: String(c.지출일 ?? ""),
+          내용: String(c.내용 ?? ""),
+          금액: Number(c.금액) || 0,
+          파트너: String(c.파트너 ?? ""),
+          지급여부: String(c.지급여부 ?? "지급 완료"),
+          선금여부: String(c.선금여부 ?? ""),
+        },
+      ],
+      true // 날짜 텍스트 저장 (serial 변환 방지)
+    );
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json(
