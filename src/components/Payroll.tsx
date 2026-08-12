@@ -58,6 +58,7 @@ export default function Payroll({
   const router = useRouter();
   const [savingYm, setSavingYm] = useState<string | null>(null);
   const [delKey, setDelKey] = useState<string | null>(null);
+  const [advKey, setAdvKey] = useState<string | null>(null);
   const [openPerson, setOpenPerson] = useState<string | null>(null);
   const [showYear, setShowYear] = useState<"2025" | "2026">("2026");
   const [editing, setEditing] = useState<Payment | null>(null);
@@ -135,6 +136,42 @@ export default function Payroll({
     } finally {
       setSavingYm(null);
     }
+  }
+
+  // 선금 → 입금완료(지급): 선금통장에서 선지급한 돈을 되돌려받았을 때 선금 표시 해제
+  async function clearAdvance(p: Payment) {
+    if (
+      !confirm(
+        `${p.수령인} ${won(p.지급총액)} — 선금 입금을 받으셨나요?\n확인하면 선금 표시가 사라지고 일반 지급으로 정리됩니다.`
+      )
+    )
+      return;
+    setAdvKey(p.지급일 + p.수령인 + p.지급총액);
+    await fetch("/api/costs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "update",
+        match: {
+          프로젝트: p.프로젝트,
+          지출일: p.지급일,
+          내용: p.내용,
+          금액: p.지급총액,
+        },
+        cost: {
+          프로젝트: p.프로젝트,
+          구분: "용역비",
+          지출일: p.지급일,
+          내용: p.내용,
+          금액: p.지급총액,
+          파트너: p.수령인,
+          지급여부: "지급 완료",
+          선금여부: "", // 선금 해제
+        },
+      }),
+    });
+    setAdvKey(null);
+    router.refresh();
   }
 
   async function del(p: Payment) {
@@ -329,6 +366,22 @@ export default function Payroll({
                                 </span>
                               ) : (
                                 <>
+                                  {선금 && (
+                                    <button
+                                      onClick={() => clearAdvance(pay)}
+                                      disabled={
+                                        advKey ===
+                                        pay.지급일 + pay.수령인 + pay.지급총액
+                                      }
+                                      className="shrink-0 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-300 rounded-full px-2 py-1 active:scale-95 disabled:opacity-50"
+                                      title="선금 입금받음 → 선금 표시 해제"
+                                    >
+                                      {advKey ===
+                                      pay.지급일 + pay.수령인 + pay.지급총액
+                                        ? "처리중…"
+                                        : "입금완료"}
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => setEditing(pay)}
                                     className="text-slate-300 hover:text-indigo-500"
